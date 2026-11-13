@@ -926,19 +926,75 @@
       });
     });
   }
+  // Icone a linea dei quattro reparti (disegni fissi, nessun testo)
+  var ICONE = {
+    tornitura: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M3 19h9v-5h18v5h15v10H30v5H12v-5H3z"/><path d="M1 24h46" stroke-dasharray="3 3" opacity=".7"/></svg>',
+    fresatura: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M20 3h8v14h-8z"/><path d="M19 17h10l-1.5 14h-7z"/><path d="M20.5 31l3.5 5 3.5-5"/><path d="M8 38h32v7H8z"/><path d="M20 21l8 3M20.5 26l7 3" opacity=".7"/></svg>',
+    cavi: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="9" cy="34" r="4.5"/><path d="M13 32c6-11 10 7 16-1s9-8 13-12"/><path d="M13.5 35.5c6-11 10 7 16-1s9-8 12.5-11.5" opacity=".6"/><path d="M41 14h5v9h-5z"/></svg>',
+    assemblaggi: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="11"/><circle cx="24" cy="24" r="4"/><g><rect x="22" y="5" width="4" height="7" rx="1"/><rect x="22" y="5" width="4" height="7" rx="1" transform="rotate(45 24 24)"/><rect x="22" y="5" width="4" height="7" rx="1" transform="rotate(90 24 24)"/><rect x="22" y="5" width="4" height="7" rx="1" transform="rotate(135 24 24)"/><rect x="22" y="5" width="4" height="7" rx="1" transform="rotate(180 24 24)"/><rect x="22" y="5" width="4" height="7" rx="1" transform="rotate(225 24 24)"/><rect x="22" y="5" width="4" height="7" rx="1" transform="rotate(270 24 24)"/><rect x="22" y="5" width="4" height="7" rx="1" transform="rotate(315 24 24)"/></g></svg>'
+  };
+  var tilesViste = false;
   function costruisciTile() {
     var griglia = document.getElementById("griglia-reparti");
     svuota(griglia);
-    REPARTI.forEach(function (r) {
-      griglia.appendChild(el("button", { type: "button", class: "reparto-tile", onclick: function () { scegliReparto(r); } },
-        el("div", null, el("h3", { text: repNome(r) }), el("p", { text: t("rep." + r + ".desc") })), el("span", { class: "vai", text: t("vai.configura") })));
+    REPARTI.forEach(function (r, i) {
+      var icona = el("span", { class: "rt-icona" });
+      icona.innerHTML = ICONE[r]; // disegni fissi definiti qui sopra, non dati dell'utente
+      var tile = el("button", { type: "button", class: "reparto-tile rivela" + (tilesViste ? " visto subito" : ""), style: "--ritardo:" + (i * 0.09) + "s", onclick: function () { scegliReparto(r); } },
+        el("div", { class: "rt-testa" }, el("span", { class: "rt-num", text: "0" + (i + 1) }), icona),
+        el("div", { class: "rt-testo" }, el("h3", { text: repNome(r) }), el("p", { text: t("rep." + r + ".desc") })),
+        el("span", { class: "vai", text: t("vai.configura") }));
+      griglia.appendChild(tile);
     });
+  }
+
+  // Comparsa allo scorrimento e numeri che si contano da soli
+  var osservatore = null;
+  function marcaRivela() {
+    var gruppi = ["#reparti .contenitore > .sopratitolo", "#reparti .contenitore > h2", "#come .contenitore > .sopratitolo", "#come .contenitore > h2", ".passi li",
+      "#numeri .numeri > div", "#configuratore .contenitore > .sopratitolo", "#configuratore .contenitore > h2", "#configuratore .contenitore > .intro"];
+    gruppi.forEach(function (sel) {
+      document.querySelectorAll(sel).forEach(function (e, i) {
+        if (!e.classList.contains("rivela")) { e.classList.add("rivela"); e.style.setProperty("--ritardo", (i * 0.1) + "s"); }
+      });
+    });
+  }
+  function contaNumero(e) {
+    var fine = parseInt(e.getAttribute("data-conta"), 10), suff = e.getAttribute("data-suffisso") || "";
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches || !isFinite(fine)) { e.textContent = fine + suff; return; }
+    var t0 = null, durata = 1300;
+    e.textContent = "0" + suff;
+    function passo(ora) {
+      if (t0 === null) t0 = ora;
+      var p = Math.min(1, (ora - t0) / durata), ease = 1 - Math.pow(1 - p, 3);
+      e.textContent = Math.round(fine * ease) + suff;
+      if (p < 1) requestAnimationFrame(passo);
+    }
+    requestAnimationFrame(passo);
+  }
+  function avviaRivela() {
+    var daVedere = document.querySelectorAll(".rivela:not(.visto)");
+    if (!("IntersectionObserver" in window)) { daVedere.forEach(function (e) { e.classList.add("visto"); }); return; }
+    if (!osservatore) {
+      osservatore = new IntersectionObserver(function (voci) {
+        voci.forEach(function (v) {
+          if (!v.isIntersecting) return;
+          var e = v.target;
+          e.classList.add("visto"); osservatore.unobserve(e);
+          if (e.classList.contains("reparto-tile")) tilesViste = true;
+          var n = e.querySelector && e.querySelector("[data-conta]");
+          if (n) contaNumero(n);
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+    }
+    daVedere.forEach(function (e) { osservatore.observe(e); });
   }
   // Aggiorna tutto cio' che dipende dalla lingua, senza perdere cio' che l'utente ha inserito
   function aggiornaLingua() {
     creaLingue();
     costruisciTile();
     var slot = document.getElementById("azzera-slot"); svuota(slot); slot.appendChild(bottoneAzzera("link-piede"));
+    avviaRivela();
     disegna();
     var inAzienda = (location.hash || "").indexOf("#/azienda") === 0;
     etichetteNav(inAzienda);
@@ -998,6 +1054,8 @@
     creaLingue();
     costruisciTile();
     document.getElementById("azzera-slot").appendChild(bottoneAzzera("link-piede"));
+    marcaRivela();
+    avviaRivela();
   }
 
   document.addEventListener("DOMContentLoaded", avvio);

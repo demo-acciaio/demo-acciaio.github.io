@@ -7,8 +7,8 @@
   var CDN = {
     occtJs: "https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/occt-import-js.js",
     occtBase: "https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/",
-    three: "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    orbit: "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js",
+    three: "three", /* risolto dalla import map: js/vendor/three.module.min.js (la stessa copia della prima schermata) */
+    orbit: "./vendor/OrbitControls.js", /* relativo a js/file.js */
     pdf: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
     pdfWorker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"
   };

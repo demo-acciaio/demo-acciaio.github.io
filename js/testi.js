@@ -31,6 +31,7 @@ it: {
   "come.2.t": "Vedi la stima", "come.2.p": "Il prezzo si aggiorna mentre scegli: materiale, lavorazione, attrezzaggio, finiture e tempi di consegna.",
   "come.3.t": "Ricevi l'offerta", "come.3.p": "L'ufficio verifica il disegno e conferma l'offerta ufficiale. La stima non è vincolante.",
   "num.1": "centri di tornitura", "num.2": "centri di fresatura", "num.3": "isole di assemblaggio", "num.4": "macchine di misura 3D",
+  "marq.1": "Acciaio", "marq.2": "Inox", "marq.3": "Alluminio", "marq.4": "Ottone", "marq.5": "Bronzo", "marq.6": "Plastica",
 
   "cfg.sopra": "Configuratore", "cfg.titolo": "Richiedi un'offerta",
   "cfg.intro": "Il prezzo mostrato è indicativo e calcolato sui costi di esempio di questa demo. L'offerta ufficiale viene preparata dopo la verifica del disegno.",
@@ -188,6 +189,7 @@ de: {
   "come.2.t": "Schätzung ansehen", "come.2.p": "Der Preis aktualisiert sich bei jeder Auswahl: Werkstoff, Bearbeitung, Rüsten, Oberflächen und Lieferzeit.",
   "come.3.t": "Angebot erhalten", "come.3.p": "Das Büro prüft die Zeichnung und bestätigt das verbindliche Angebot. Die Schätzung ist unverbindlich.",
   "num.1": "Drehzentren", "num.2": "Fräszentren", "num.3": "Montageinseln", "num.4": "3D-Messmaschinen",
+  "marq.1": "Stahl", "marq.2": "Edelstahl", "marq.3": "Aluminium", "marq.4": "Messing", "marq.5": "Bronze", "marq.6": "Kunststoff",
 
   "cfg.sopra": "Konfigurator", "cfg.titolo": "Angebot anfragen",
   "cfg.intro": "Der angezeigte Preis ist unverbindlich und basiert auf den Beispielkosten dieser Demo. Das verbindliche Angebot wird nach Prüfung der Zeichnung erstellt.",
@@ -365,6 +367,7 @@ en: {
   "come.2.t": "See the estimate", "come.2.p": "The price updates as you choose: material, machining, set-up, finishes and delivery time.",
   "come.3.t": "Receive the quote", "come.3.p": "Our office checks the drawing and confirms the official quote. The estimate is not binding.",
   "num.1": "turning centres", "num.2": "milling centres", "num.3": "assembly cells", "num.4": "3D measuring machines",
+  "marq.1": "Steel", "marq.2": "Stainless", "marq.3": "Aluminium", "marq.4": "Brass", "marq.5": "Bronze", "marq.6": "Plastic",
 
   "cfg.sopra": "Configurator", "cfg.titolo": "Request a quote",
   "cfg.intro": "The price shown is indicative and based on the sample costs of this demo. The official quote is prepared after the drawing has been checked.",
