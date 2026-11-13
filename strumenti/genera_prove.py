@@ -15,7 +15,7 @@ OUT = os.path.join(BASE, "esempi", "prove")
 os.makedirs(OUT, exist_ok=True)
 
 # 1) PDF scansionato: la pagina del disegno diventa una foto, senza testo
-pagina = pymupdf.open(os.path.join(BASE, "esempi", "pdf", "perno-inox.pdf"))[0]
+pagina = pymupdf.open(os.path.join(BASE, "esempi", "pezzi", "perno-inox.pdf"))[0]
 png = os.path.join(OUT, "_tmp.png")
 pagina.get_pixmap(dpi=110, colorspace=pymupdf.csGRAY).save(png)
 w, h = landscape(A4)

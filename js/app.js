@@ -242,26 +242,39 @@
     var lista = Array.prototype.slice.call(elenco);
     var step = lista.filter(function (f) { return /\.(step|stp)$/i.test(f.name); })[0];
     var pdf = lista.filter(function (f) { return /\.pdf$/i.test(f.name); })[0];
-    if (!step && !pdf) { scartaFile(); cfg.file = { errori: ["Formato non supportato: carica un file STEP (.step, .stp) o un PDF."], avvisi: [] }; disegna(); return; }
+    if (!step && !pdf) {
+      var msg = "Formato non supportato: carica un file STEP (.step, .stp) o un PDF.";
+      if (cfg.file && (cfg.file.step || cfg.file.pdf)) cfg.file.errori = [msg];   // i file già caricati restano
+      else { scartaFile(); cfg.file = { errori: [msg], avvisi: [] }; }
+      disegna(); return;
+    }
     var voci = [];
     if (step) voci.push({ nome: step.name, tipo: "step", dimensione: step.size, leggi: function () { return leggiBuffer(step); } });
     if (pdf) voci.push({ nome: pdf.name, tipo: "pdf", dimensione: pdf.size, leggi: function () { return leggiBuffer(pdf); } });
-    eseguiCaricamento(voci, null);
+    eseguiCaricamento(voci, null, true); // true = i file già caricati dell'altro tipo restano (STEP + PDF si sommano)
   }
   function caricaEsempio(id) {
     var e = trova(ESEMPI, id);
     if (cfg.dati.reparto !== e.rep) cfg.dati = nuoviDati(e.rep);
     cfg.dati.macchina = e.macchina; cfg.dati.complessita = e.complessita;
     eseguiCaricamento([
-      { nome: id + ".step", tipo: "step", leggi: function () { return scaricaBuffer("esempi/step/" + id + ".step"); } },
-      { nome: id + ".pdf", tipo: "pdf", leggi: function () { return scaricaBuffer("esempi/pdf/" + id + ".pdf"); } }
+      { nome: id + ".step", tipo: "step", leggi: function () { return scaricaBuffer("esempi/pezzi/" + id + ".step"); } },
+      { nome: id + ".pdf", tipo: "pdf", leggi: function () { return scaricaBuffer("esempi/pezzi/" + id + ".pdf"); } }
     ], id);
   }
 
-  function eseguiCaricamento(voci, esempioId) {
-    scartaFile();
-    var token = cfg.tokenFile;
-    cfg.file = { caricamento: true, nomi: voci.map(function (v) { return v.nome; }) };
+  var CAMPI_STEP = ["misure"], CAMPI_PDF = ["materiale", "tolleranza", "quantita", "finitura"];
+  function tuttiGliAvvisi(f) { return (f.avvisiStep || []).concat(f.avvisiPdf || [], f.avvisi || []); }
+
+  function eseguiCaricamento(voci, esempioId, mantieni) {
+    // Con "mantieni", lo STEP già letto resta se ora si aggiunge un PDF (e viceversa)
+    var prec = mantieni && cfg.file && !cfg.file.caricamento ? cfg.file : null;
+    var tieneStep = !!(prec && prec.step && !voci.some(function (v) { return v.tipo === "step"; }));
+    var tienePdf = !!(prec && prec.pdf && !voci.some(function (v) { return v.tipo === "pdf"; }));
+    var viewerTenuto = tieneStep ? prec.viewer : null;
+    if (cfg.file && cfg.file.viewer && cfg.file.viewer !== viewerTenuto) cfg.file.viewer.dispose();
+    var token = ++cfg.tokenFile;
+    cfg.file = { caricamento: true, nomi: voci.map(function (v) { return v.nome; }), viewer: viewerTenuto };
     disegna();
     var d = cfg.dati;
     var compiti = voci.map(function (v) {
@@ -272,7 +285,16 @@
     });
     Promise.all(compiti).then(function (ris) {
       if (token !== cfg.tokenFile) return; // nel frattempo e' stato scelto un altro file
-      var f = { esempio: esempioId, errori: [], avvisi: [], compilati: {} };
+      var f = { esempio: mantieni ? null : esempioId, errori: [], avvisi: [], avvisiStep: [], avvisiPdf: [], compilati: {} };
+      if (tieneStep) {
+        f.step = prec.step; f.viewer = viewerTenuto; f.viewerErrore = prec.viewerErrore; f.volumeIgnorato = prec.volumeIgnorato;
+        f.avvisiStep = (prec.avvisiStep || []).slice();
+        CAMPI_STEP.forEach(function (k) { if (prec.compilati && prec.compilati[k]) f.compilati[k] = true; });
+      }
+      if (tienePdf) {
+        f.pdf = prec.pdf; f.avvisiPdf = (prec.avvisiPdf || []).slice();
+        CAMPI_PDF.forEach(function (k) { if (prec.compilati && prec.compilati[k]) f.compilati[k] = true; });
+      }
       ris.forEach(function (x) {
         if (x.errore) { f.errori.push(x.errore); return; }
         if (x.tipo === "step") applicaStep(f, x, d);
@@ -280,7 +302,7 @@
       ris.forEach(function (x) { if (!x.errore && x.tipo === "pdf") applicaPdf(f, x, d); }); // il PDF dopo lo STEP: il materiale del disegno vince
       cfg.file = f;
       disegna();
-      if (f.step) {
+      if (f.step && !f.viewer) {
         window.FILE.creaViewer(f.step.meshes).then(function (v) {
           if (token !== cfg.tokenFile) { v.dispose(); return; }
           f.viewer = v; disegna();
@@ -293,26 +315,26 @@
     var m = window.FILE.proponiMisure(r.ingombro, rep);
     if (rep === "tornitura") {
       d.geometria = { diametro: m.diametro, lunghezza: m.lunghezza, volumeFinito: r.volumeCm3 };
-      if (!m.tondo) f.avvisi.push("Il pezzo non sembra rotondo: se è prismatico conviene la fresatura. Controlla le misure.");
+      if (!m.tondo) f.avvisiStep.push("Il pezzo non sembra rotondo: se è prismatico conviene la fresatura. Controlla le misure.");
     } else {
       d.geometria = { x: m.x, y: m.y, z: m.z, volumeFinito: r.volumeCm3 };
     }
     f.compilati.misure = true;
-    if (r.corpi > 1) f.avvisi.push("Il file contiene " + r.corpi + " corpi: il volume è la somma di tutti.");
+    if (r.corpi > 1) f.avvisiStep.push("Il file contiene " + r.corpi + " corpi: il volume è la somma di tutti.");
     f.step = { nome: x.nome, ingombro: r.ingombro, volume: r.volumeCm3, meshes: r.meshes };
   }
   function applicaPdf(f, x, d) {
     var r = x.r, c = r.campi;
     f.pdf = { nome: x.nome, trovati: r.trovati, canvas: r.canvas, haTesto: r.haTesto, titolo: r.titolo };
-    if (!r.haTesto) { f.avvisi.push("Il PDF non contiene testo leggibile (forse è una scansione): mostro solo l'anteprima, compila i dati a mano."); return; }
-    if (!r.trovati.length) { f.avvisi.push("Nel PDF non ho trovato un cartiglio riconoscibile (materiale, quantità, tolleranze): compila i dati a mano."); return; }
+    if (!r.haTesto) { f.avvisiPdf.push("Il PDF non contiene testo leggibile (forse è una scansione): mostro solo l'anteprima, compila i dati a mano."); return; }
+    if (!r.trovati.length) { f.avvisiPdf.push("Nel PDF non ho trovato un cartiglio riconoscibile (materiale, quantità, tolleranze): compila i dati a mano."); return; }
     if (d.reparto !== "tornitura" && d.reparto !== "fresatura") return;
     if (c.materiale && trova(S.materiali, c.materiale)) { d.materiale = c.materiale; f.compilati.materiale = true; }
     if (c.tolleranza) { d.tolleranza = c.tolleranza; f.compilati.tolleranza = true; }
     if (c.quantita) { d.quantita = c.quantita; f.compilati.quantita = true; }
     if (c.finitura) {
       var fin = trova(S.finiture, c.finitura), mat = trova(S.materiali, d.materiale);
-      if (fin.gruppi && fin.gruppi.indexOf(mat.gruppo) < 0) f.avvisi.push("Il disegno indica «" + fin.nome + "», che non è adatta a questo materiale: non è stata applicata.");
+      if (fin.gruppi && fin.gruppi.indexOf(mat.gruppo) < 0) f.avvisiPdf.push("Il disegno indica «" + fin.nome + "», che non è adatta a questo materiale: non è stata applicata.");
       else { d.finitura = c.finitura; f.compilati.finitura = true; }
     }
   }
@@ -325,8 +347,14 @@
       box.appendChild(el("p", { class: "aiuto", text: "Con un file STEP leggo le misure e il volume del pezzo e il prezzo diventa più preciso. Con un PDF leggo il cartiglio (materiale, quantità, tolleranze). I file restano nel tuo browser." }));
       var input = el("input", { type: "file", id: "file-in", class: "file-input", accept: ".step,.stp,.pdf,application/pdf", multiple: true, "aria-label": "Scegli un file STEP o PDF" });
       input.addEventListener("change", function () { if (input.files.length) caricaFileUtente(input.files); });
-      var zona = el("div", { class: "dropzone", tabindex: "0", role: "button", "aria-label": "Carica un file STEP o PDF" },
-        el("strong", { text: "Trascina qui il disegno" }), el("span", { text: "oppure clicca per scegliere un file · STEP, STP o PDF" }));
+      // Il testo della zona guida il passo dopo: se c'è solo lo STEP chiede il PDF, e viceversa
+      var haStep = !!(f && f.step), haPdf = !!(f && f.pdf), titoloZona, testoZona;
+      if (haStep && !haPdf) { titoloZona = "Aggiungi anche il PDF del disegno"; testoZona = "Trascinalo qui o clicca: leggo materiale, quantità e tolleranze dal cartiglio"; }
+      else if (haPdf && !haStep) { titoloZona = "Aggiungi anche il file STEP"; testoZona = "Trascinalo qui o clicca: leggo misure e volume e ti mostro il pezzo in 3D"; }
+      else if (haStep && haPdf) { titoloZona = "Vuoi cambiare un file?"; testoZona = "Trascina qui un nuovo STEP o PDF: sostituisce quello dello stesso tipo"; }
+      else { titoloZona = "Trascina qui il disegno"; testoZona = "oppure clicca per scegliere un file · STEP, STP o PDF (anche tutti e due insieme)"; }
+      var zona = el("div", { class: "dropzone", tabindex: "0", role: "button", "aria-label": titoloZona },
+        el("strong", { text: titoloZona }), el("span", { text: testoZona }));
       zona.addEventListener("click", function () { input.click(); });
       zona.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); input.click(); } });
       zona.addEventListener("dragover", function (ev) { ev.preventDefault(); zona.classList.add("sopra"); });
@@ -378,8 +406,8 @@
       }
       pdfBox.appendChild(lato); out.appendChild(pdfBox);
     }
-    (f.avvisi || []).forEach(function (a) { out.appendChild(el("div", { class: "avviso", role: "status", text: a })); });
-    out.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { scartaFile(); disegna(); } }, "Rimuovi il file"));
+    tuttiGliAvvisi(f).forEach(function (a) { out.appendChild(el("div", { class: "avviso", role: "status", text: a })); });
+    out.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { scartaFile(); disegna(); } }, "Rimuovi i file"));
     return out;
   }
 
@@ -762,11 +790,11 @@
       var slot = el("div", { class: "viewer-slot", text: "Preparo l'anteprima 3D…" });
       sez.appendChild(slot);
       var token = ++az.tokenViewer;
-      scaricaBuffer("esempi/step/" + file.esempio + ".step").then(window.FILE.leggiStep).then(function (r) { return window.FILE.creaViewer(r.meshes); }).then(function (v) {
+      scaricaBuffer("esempi/pezzi/" + file.esempio + ".step").then(window.FILE.leggiStep).then(function (r) { return window.FILE.creaViewer(r.meshes); }).then(function (v) {
         if (token !== az.tokenViewer) { v.dispose(); return; }
         az.viewer = v; svuota(slot); slot.classList.add("pronto"); slot.appendChild(v.el);
       }).catch(function (e) { slot.textContent = "Anteprima non disponibile: " + (e && e.message ? e.message : "errore"); });
-      sez.appendChild(el("p", null, el("a", { href: "esempi/pdf/" + file.esempio + ".pdf", target: "_blank", rel: "noopener", text: "Apri il disegno PDF" })));
+      sez.appendChild(el("p", null, el("a", { href: "esempi/pezzi/" + file.esempio + ".pdf", target: "_blank", rel: "noopener", text: "Apri il disegno PDF" })));
     } else if (file.step || file.pdf) {
       sez.appendChild(el("p", { class: "aiuto", text: "In questa demo il file resta nel browser di chi l'ha caricato. In una versione reale arriverebbe all'ufficio insieme alla richiesta." }));
     }

@@ -1,6 +1,6 @@
 """Genera i file di esempio della demo: pezzi STEP e disegni PDF con cartiglio.
 Uso (da un ambiente con cadquery e reportlab):  python strumenti/genera_esempi.py
-Scrive in esempi/step e esempi/pdf, e esempi/elenco.json (misure e volumi reali, per controllo)."""
+Scrive in esempi/pezzi (STEP e PDF insieme), e esempi/elenco.json (misure e volumi reali, per controllo)."""
 import json
 import os
 import cadquery as cq
@@ -9,8 +9,8 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STEP_DIR = os.path.join(BASE, "esempi", "step")
-PDF_DIR = os.path.join(BASE, "esempi", "pdf")
+STEP_DIR = os.path.join(BASE, "esempi", "pezzi")
+PDF_DIR = os.path.join(BASE, "esempi", "pezzi")
 os.makedirs(STEP_DIR, exist_ok=True)
 os.makedirs(PDF_DIR, exist_ok=True)
 
