@@ -206,11 +206,19 @@
   }
   function togliDalFile(chiave) { if (cfg.file && cfg.file.compilati) delete cfg.file.compilati[chiave]; }
 
-  function gruppoScelte(etichetta, elenco, valore, alScelta, aiuto, chiave) {
-    var box = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta" }, etichetta, badgeFile(chiave)));
+  function gruppoScelte(etichetta, elenco, valore, alScelta, aiuto, chiave, forma) {
+    var box = el("div", { class: "cfg-gruppo" + (forma === "meta" ? "" : " largo") }, el("span", { class: "etichetta" }, etichetta, badgeFile(chiave)));
     // nomi corti (es. Semplice / Media / Complessa): sul telefono si dividono in colonne uguali
     var compatte = elenco.every(function (v) { return String(v.nome).length <= 12; });
-    var scelte = el("div", { class: "scelte" + (compatte ? " compatte" : ""), role: "group", "aria-label": etichetta });
+    // Colonne scelte in modo che le righe siano sempre piene (es. 8 materiali = 4 + 4, non 3 + 3 + 2)
+    var maxLen = 0; elenco.forEach(function (v) { maxLen = Math.max(maxLen, String(v.nome).length); });
+    var nOpz = elenco.length, tetto = maxLen <= 8 ? 7 : (maxLen <= 32 ? 4 : 2);
+    if (forma === "meta") tetto = Math.min(tetto, 3);
+    var col = 1; for (var cc = Math.min(tetto, nOpz); cc >= 1; cc--) { if (nOpz % cc === 0) { col = cc; break; } }
+    if (col === 1 && nOpz > 1) col = Math.min(tetto, nOpz);
+    var colM = nOpz % 2 === 0 ? 2 : (nOpz % 3 === 0 ? 3 : 2);                         // schermi medi (iPad verticale, telefono grande)
+    var colC = nOpz % 3 === 0 ? 3 : (nOpz % 4 === 0 ? 4 : (nOpz % 2 === 0 ? 2 : Math.min(nOpz, 4))); // telefono, nomi corti
+    var scelte = el("div", { class: "scelte" + (compatte ? " compatte" : ""), role: "group", "aria-label": etichetta, style: "--col:" + col + ";--colm:" + colM + ";--colc:" + colC });
     elenco.forEach(function (v) {
       scelte.appendChild(el("button", {
         type: "button", class: "scelta", "aria-pressed": String(v.id === valore), disabled: !!v.disabilitata,
@@ -504,17 +512,27 @@
     var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p2.titolo", { rep: repNome(rep) }) }));
     box.appendChild(cardFile(rep));
 
+    // Il modulo e' diviso in sezioni numerate; i gruppi a mezza larghezza vanno sempre in coppia (mai spazi vuoti)
+    var nSez = 0;
+    function sezione(chiaveTitolo, nodi) {
+      nSez++;
+      box.appendChild(el("section", { class: "cfg-sezione" },
+        el("header", { class: "cfg-sez-testa" }, el("span", { class: "cfg-sez-num", "aria-hidden": "true", text: String(nSez) }), el("h4", { text: t(chiaveTitolo) })),
+        el("div", { class: "cfg-sez-corpo" }, nodi)));
+    }
+    var gCollaudo = function () { return gruppoScelte(t("l.collaudo"), voci("col", S.collaudi), d.collaudo, function (v) { d.collaudo = v; aggiorna(); }); };
+
     if (rep === "tornitura" || rep === "fresatura") {
       var macchine = rep === "tornitura" ? ["tornio", "tornio-y"] : ["fresa-3", "fresa-4", "fresa-5"];
-      box.appendChild(gruppoScelte(t("l.macchina"), macchine.map(function (id) { return { id: id, nome: macNome(id) }; }), d.macchina,
+      var gMacchina = gruppoScelte(t("l.macchina"), macchine.map(function (id) { return { id: id, nome: macNome(id) }; }), d.macchina,
         function (v) { d.macchina = v; aggiorna(); },
-        rep === "tornitura" ? t("h.tornio_y") : t("h.piu_assi")));
-      box.appendChild(gruppoScelte(t("l.materiale"), materialiCompatibili(), d.materiale, function (v) {
+        rep === "tornitura" ? t("h.tornio_y") : t("h.piu_assi"));
+      var gMateriale = gruppoScelte(t("l.materiale"), materialiCompatibili(), d.materiale, function (v) {
         d.materiale = v; togliDalFile("materiale");
         var f = trova(S.finiture, d.finitura), m = trova(S.materiali, v);
         if (f.gruppi && f.gruppi.indexOf(m.gruppo) < 0) { d.finitura = "nessuna"; togliDalFile("finitura"); }
         aggiorna();
-      }, null, "materiale"));
+      }, null, "materiale");
       var misure = el("div", { class: "cfg-griglia" });
       if (rep === "tornitura") {
         misure.appendChild(campoNumero(t("l.diametro"), d.geometria.diametro, "mm", function (v) { modificaMisura(d, "diametro", v); aggiornaPrezzo(); }));
@@ -524,44 +542,53 @@
         misure.appendChild(campoNumero(t("l.y"), d.geometria.y, "mm", function (v) { modificaMisura(d, "y", v); aggiornaPrezzo(); }));
         misure.appendChild(campoNumero(t("l.z"), d.geometria.z, "mm", function (v) { modificaMisura(d, "z", v); aggiornaPrezzo(); }));
       }
-      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta" }, t("l.misure"), badgeFile("misure")), misure));
-      box.appendChild(gruppoScelte(t("l.complessita"), voci("cpx", S.complessita), d.complessita, function (v) { d.complessita = v; aggiorna(); }));
-      box.appendChild(gruppoScelte(t("l.tolleranze"), voci("tol", S.tolleranze), d.tolleranza, function (v) { d.tolleranza = v; togliDalFile("tolleranza"); aggiorna(); }, null, "tolleranza"));
+      var gMisure = el("div", { class: "cfg-gruppo largo" }, el("span", { class: "etichetta" }, t("l.misure"), badgeFile("misure")), misure);
+      var gComplessita = gruppoScelte(t("l.complessita"), voci("cpx", S.complessita), d.complessita, function (v) { d.complessita = v; aggiorna(); });
+      var gTolleranze = gruppoScelte(t("l.tolleranze"), voci("tol", S.tolleranze), d.tolleranza, function (v) { d.tolleranza = v; togliDalFile("tolleranza"); aggiorna(); }, null, "tolleranza");
       var mat = trova(S.materiali, d.materiale);
-      box.appendChild(gruppoScelte(t("l.finitura"), S.finiture.map(function (f) {
+      var gFinitura = gruppoScelte(t("l.finitura"), S.finiture.map(function (f) {
         var no = f.gruppi && f.gruppi.indexOf(mat.gruppo) < 0;
         return { id: f.id, nome: nm("fin", f), disabilitata: no ? t("h.non_adatta") : null };
-      }), d.finitura, function (v) { d.finitura = v; togliDalFile("finitura"); aggiorna(); }, null, "finitura"));
+      }), d.finitura, function (v) { d.finitura = v; togliDalFile("finitura"); aggiorna(); }, null, "finitura");
+      sezione("sz.macchina", [gMacchina, gMateriale]);
+      sezione("sz.misure", [gMisure]);
+      sezione("sz.precisione", [gComplessita, gTolleranze]);
+      sezione("sz.finitura", [gFinitura, gCollaudo()]);
     }
 
     if (rep === "cavi") {
       var C = S.cavi, prod = trova(C.prodotti, d.prodotto);
-      box.appendChild(gruppoScelte(t("l.prodotto"), voci("prod", C.prodotti), d.prodotto, function (v) {
+      var gProdotto = gruppoScelte(t("l.prodotto"), voci("prod", C.prodotti), d.prodotto, function (v) {
         d.prodotto = v; var p = trova(C.prodotti, v);
         if (p.diametri.indexOf(d.diametro) < 0) d.diametro = p.diametri[Math.min(1, p.diametri.length - 1)];
         aggiorna();
-      }));
-      box.appendChild(gruppoScelte(t("l.diametro"), prod.diametri.map(function (x) { return { id: x, nome: x + " mm" }; }), d.diametro, function (v) { d.diametro = v; aggiorna(); }));
-      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero(t("l.lunghezza"), d.lunghezza, "mm", function (v) { d.lunghezza = v; aggiornaPrezzo(); })));
-      box.appendChild(gruppoScelte(t("l.guaina"), voci("guaina", C.guaine), d.guaina, function (v) { d.guaina = v; aggiorna(); }));
-      box.appendChild(gruppoScelte(t("l.term_a"), voci("term", C.terminali), d.terminaleA, function (v) { d.terminaleA = v; aggiorna(); }));
-      box.appendChild(gruppoScelte(t("l.term_b"), voci("term", C.terminali), d.terminaleB, function (v) { d.terminaleB = v; aggiorna(); }));
+      });
+      var gDiametro = gruppoScelte(t("l.diametro"), prod.diametri.map(function (x) { return { id: x, nome: x + " mm" }; }), d.diametro, function (v) { d.diametro = v; aggiorna(); });
+      var gLunghezza = el("div", { class: "cfg-gruppo" }, campoNumero(t("l.lunghezza"), d.lunghezza, "mm", function (v) { d.lunghezza = v; aggiornaPrezzo(); }));
+      var gGuaina = gruppoScelte(t("l.guaina"), voci("guaina", C.guaine), d.guaina, function (v) { d.guaina = v; aggiorna(); }, null, null, "meta");
+      var gTermA = gruppoScelte(t("l.term_a"), voci("term", C.terminali), d.terminaleA, function (v) { d.terminaleA = v; aggiorna(); });
+      var gTermB = gruppoScelte(t("l.term_b"), voci("term", C.terminali), d.terminaleB, function (v) { d.terminaleB = v; aggiorna(); });
+      sezione("sz.prodotto", [gProdotto, gDiametro, gLunghezza, gGuaina]);
+      sezione("sz.terminali", [gTermA, gTermB]);
+      sezione("sz.controlli", [gCollaudo()]);
     }
 
     if (rep === "assemblaggi") {
-      var opBox = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: t("l.operazioni") }));
+      var opBox = el("div", { class: "cfg-gruppo largo" }, el("span", { class: "etichetta", text: t("l.operazioni") }));
       S.assemblaggi.operazioni.forEach(function (op) {
         opBox.appendChild(el("div", { class: "riga-contatore" },
           el("span", { text: nm("op", op) }), contatore(d.opN[op.id], 0, 20, function (n) { d.opN[op.id] = n; aggiorna(); })));
       });
-      box.appendChild(opBox);
-      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: t("l.componenti") }), contatore(d.componenti, 0, 100, function (n) { d.componenti = n; aggiorna(); })));
-      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero(t("l.costo_comp"), d.costoComponentiPezzo, "€", function (v) { d.costoComponentiPezzo = v; aggiornaPrezzo(); })));
+      var gComponenti = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: t("l.componenti") }), contatore(d.componenti, 0, 100, function (n) { d.componenti = n; aggiorna(); }));
+      var gCostoComp = el("div", { class: "cfg-gruppo" }, campoNumero(t("l.costo_comp"), d.costoComponentiPezzo, "\u20ac", function (v) { d.costoComponentiPezzo = v; aggiornaPrezzo(); }));
+      sezione("sz.operazioni", [opBox]);
+      sezione("sz.componenti", [gComponenti, gCostoComp]);
+      sezione("sz.controlli", [gCollaudo()]);
     }
 
-    box.appendChild(gruppoScelte(t("l.collaudo"), voci("col", S.collaudi), d.collaudo, function (v) { d.collaudo = v; aggiorna(); }));
-    box.appendChild(gruppoScelte(t("l.urgenza"), S.urgenze.map(function (u) { return { id: u.id, nome: nm("urg", u), sub: u.sovrapprezzo ? "+" + Math.round(u.sovrapprezzo * 100) + "%" : t("u.tempi_normali") }; }), d.urgenza, function (v) { d.urgenza = v; aggiorna(); }));
-    box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero(t("l.quantita"), d.quantita, t("u.pz"), function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); togliDalFile("quantita"); aggiornaPrezzo(); }, { min: 1, step: 1, chiave: "quantita" })));
+    var gUrgenza = gruppoScelte(t("l.urgenza"), S.urgenze.map(function (u) { return { id: u.id, nome: nm("urg", u), sub: u.sovrapprezzo ? "+" + Math.round(u.sovrapprezzo * 100) + "%" : t("u.tempi_normali") }; }), d.urgenza, function (v) { d.urgenza = v; aggiorna(); }, null, null, "meta");
+    var gQuantita = el("div", { class: "cfg-gruppo" }, campoNumero(t("l.quantita"), d.quantita, t("u.pz"), function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); togliDalFile("quantita"); aggiornaPrezzo(); }, { min: 1, step: 1, chiave: "quantita" }));
+    sezione("sz.quantita", [gQuantita, gUrgenza]);
 
     var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { vaiPasso(3); vaiA("configuratore"); } }, t("b.continua"), el("span", { "aria-hidden": "true", text: "→" }));
     box.appendChild(el("div", { class: "cfg-azioni" },

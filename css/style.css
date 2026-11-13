@@ -590,3 +590,34 @@ html[data-theme="dark"] .prezzo-grande { background: linear-gradient(180deg, #ff
 @media (prefers-reduced-motion: reduce) {
   .led, .toast, .toast.esce { animation: none; }
 }
+
+/* ==========================================================================
+   9. CONFIGURATORE: MODULO A SEZIONI NUMERATE
+   Ogni gruppo di scelte sta in una sezione; le scelte sono in griglia a colonne uguali (mai righe sfalsate).
+   I gruppi a mezza larghezza vanno sempre in coppia: niente buchi.
+   ========================================================================== */
+.cfg-sezione { margin: 0 0 1.25rem; padding: 1.2rem 1.3rem .35rem; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--acc) 3%, var(--bg-2)); }
+.cfg-sez-testa { display: flex; align-items: center; gap: .75rem; margin: 0 0 1.1rem; padding-bottom: .8rem; border-bottom: 1px solid var(--line); }
+.cfg-sez-num { display: grid; place-items: center; flex: none; width: 1.7rem; height: 1.7rem; border: 1px solid var(--acc); border-radius: 50%; font-family: var(--mono); font-size: .78rem; font-weight: 700; color: var(--acc); }
+.cfg-sez-testa h4 { margin: 0; font-size: 1.02rem; font-weight: 800; letter-spacing: .01em; color: var(--titolo); }
+.cfg-sez-corpo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.6rem; align-items: start; }
+.cfg-sez-corpo > .cfg-gruppo { margin-bottom: 1.3rem; }
+.cfg-sez-corpo > .cfg-gruppo.largo { grid-column: 1 / -1; }
+.cfg-sezione .scelte { display: grid; grid-template-columns: repeat(var(--col, 3), minmax(0, 1fr)); gap: .5rem; }
+.cfg-sezione .scelta { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.cfg-sezione .cfg-gruppo > .campo > .input-unita { max-width: none; }
+.cfg-sezione .campo { margin-bottom: 0; }
+
+@media (max-width: 1049.98px) and (orientation: portrait) {
+  .cfg-sez-corpo { gap: 0 1.2rem; }
+}
+@media (max-width: 700px) {
+  .cfg-sez-corpo { grid-template-columns: minmax(0, 1fr); }
+  .cfg-sezione .scelte { grid-template-columns: repeat(var(--colm, 2), minmax(0, 1fr)); }
+}
+@media (max-width: 440px) {
+  .cfg-sezione { padding: 1rem 1rem .25rem; }
+  .cfg-sezione .scelte { grid-template-columns: minmax(0, 1fr); }
+  .cfg-sezione .scelte.compatte { grid-template-columns: repeat(var(--colc, 3), minmax(0, 1fr)); }
+  .cfg-sezione .scelte.compatte > .scelta { text-align: center; padding-inline: .4rem; }
+}
