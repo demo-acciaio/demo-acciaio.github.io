@@ -9,6 +9,7 @@
     occtBase: "https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/",
     three: "three", /* risolto dalla import map: js/vendor/three.module.min.js (la stessa copia della prima schermata) */
     orbit: "./vendor/OrbitControls.js", /* relativo a js/file.js */
+    env: "./vendor/RoomEnvironment.js",
     pdf: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
     pdfWorker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"
   };
@@ -85,20 +86,23 @@
 
   /* ---------------- Anteprima 3D ---------------- */
   function creaViewer(meshes) {
-    return Promise.all([import(CDN.three), import(CDN.orbit)]).then(function (r) {
-      var THREE = r[0], OC = r[1];
+    return Promise.all([import(CDN.three), import(CDN.orbit), import(CDN.env)]).then(function (r) {
+      var THREE = r[0], OC = r[1], RE = r[2];
       var el = document.createElement("div");
       el.className = "viewer3d";
       var renderer;
       try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
       catch (e) { throw new Error("f.err.webgl"); }
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.outputColorSpace = THREE.SRGBColorSpace;
       el.appendChild(renderer.domElement);
 
       var scena = new THREE.Scene();
+      scena.environment = new THREE.PMREMGenerator(renderer).fromScene(new RE.RoomEnvironment(), 0.04).texture; // stessi riflessi da officina della prima schermata
+      scena.environmentIntensity = 1.1;
       var gruppo = new THREE.Group();
-      var matCorpo = new THREE.MeshStandardMaterial({ color: 0x8fa6cf, metalness: 0.55, roughness: 0.42 });
-      var matLinee = new THREE.LineBasicMaterial({ color: 0x1c2a66 });
+      var matCorpo = new THREE.MeshStandardMaterial({ color: 0xcfd8e6, metalness: 0.95, roughness: 0.32, envMapIntensity: 1.25 });
+      var matLinee = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.3 });
       meshes.forEach(function (m) {
         var g = new THREE.BufferGeometry();
         g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(m.attributes.position.array), 3));
@@ -109,9 +113,9 @@
         gruppo.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 28), matLinee));
       });
       scena.add(gruppo);
-      scena.add(new THREE.HemisphereLight(0xffffff, 0x445577, 1.1));
-      var l1 = new THREE.DirectionalLight(0xffffff, 1.6); l1.position.set(1, 1.5, 1); scena.add(l1);
-      var l2 = new THREE.DirectionalLight(0xffffff, 0.7); l2.position.set(-1, -0.5, -1); scena.add(l2);
+      scena.add(new THREE.HemisphereLight(0xa9c2f0, 0x1b2745, 0.55));
+      var l1 = new THREE.DirectionalLight(0xffffff, 1.3); l1.position.set(1, 1.5, 1); scena.add(l1);
+      var l2 = new THREE.DirectionalLight(0x22d3ee, 1.6); l2.position.set(-1.4, 0.5, -1); scena.add(l2);
 
       var box = new THREE.Box3().setFromObject(gruppo);
       var centro = box.getCenter(new THREE.Vector3());

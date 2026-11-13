@@ -478,3 +478,115 @@ html[data-theme="dark"] .dropzone { border-color: color-mix(in srgb, var(--acc) 
 html[data-theme="dark"] .dropzone:hover, html[data-theme="dark"] .dropzone.sopra { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 8%, var(--bg)); }
 html[data-theme="dark"] .piede { background: #04070f; }
 html[data-theme="dark"] .anteprima-pdf { filter: brightness(.92); }
+
+/* ==========================================================================
+   8. CONFIGURATORE "CABINA DI COMANDO" E VISTA AZIENDA
+   ========================================================================== */
+/* Barra dei passi: collegati da una linea che si accende */
+.cfg-passi { gap: 0; align-items: center; }
+.cfg-passo + .cfg-passo { margin-left: 1.8rem; position: relative; }
+.cfg-passo + .cfg-passo::before { content: ""; position: absolute; left: -1.8rem; top: 50%; width: 1.8rem; height: 1px; background: var(--line); }
+.cfg-passo.attivo::before, .cfg-passo.fatto + .cfg-passo::before { background: var(--acc); }
+
+/* Passo 1: riquadri dei reparti con icona */
+.reparto-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.1rem; padding: 1.25rem 1.3rem; text-align: left; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(165deg, color-mix(in srgb, var(--card) 90%, var(--blu)) 0%, var(--card) 70%); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.reparto-card:hover { transform: translateY(-3px); border-color: var(--acc); box-shadow: var(--glow); }
+.rc-icona { width: 54px; height: 54px; color: var(--acc); }
+.rc-icona svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.rc-nome { display: block; font-weight: 800; font-size: 1.05rem; color: var(--titolo); }
+.rc-desc { display: block; margin-top: .25rem; font-size: .82rem; font-weight: 500; color: var(--muted); }
+.rc-freccia { font-family: var(--mono); font-size: 1.3rem; color: var(--acc); transition: transform .2s ease; }
+.reparto-card:hover .rc-freccia { transform: translateX(4px); }
+
+/* Scheda del prezzo */
+.prezzo-testa { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; }
+.prezzo-testa h3 { margin: 0; flex: 1; }
+.led { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--acc); animation: pulsa 2.2s ease-out infinite; }
+@keyframes pulsa { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--acc) 65%, transparent); } 70% { box-shadow: 0 0 0 9px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.live { font-family: var(--mono); font-size: .62rem; letter-spacing: .16em; padding: .15rem .45rem; border: 1px solid color-mix(in srgb, var(--acc) 50%, transparent); border-radius: 4px; color: var(--acc); }
+.prezzo-hero { margin: .1rem 0 .5rem; }
+.prezzo-grande { font-family: var(--mono); font-size: clamp(1.9rem, 3vw, 2.5rem); font-weight: 700; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+html[data-theme="dark"] .prezzo-grande { background: linear-gradient(180deg, #ffffff 15%, #7ee8fa 115%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.prezzo-range { margin: .4rem 0 0; font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+.prezzo-sotto { margin: .1rem 0 1rem; }
+.barra { height: 8px; gap: 2px; border-radius: 4px; background: transparent; }
+.barra i { border-radius: 2px; }
+.voci li { align-items: center; }
+.voce-nome { display: flex; align-items: center; gap: .6rem; }
+.punto { width: 9px; height: 9px; flex: none; border-radius: 3px; background: var(--col); box-shadow: 0 0 10px -2px var(--col); }
+.voci li span:last-child { font-family: var(--mono); font-size: .84rem; }
+.dati-rapidi div { border: 1px solid var(--line); background: color-mix(in srgb, var(--acc) 5%, var(--bg-2)); }
+.dati-rapidi .ico { display: block; width: 18px; height: 18px; margin: 0 auto .35rem; color: var(--acc); }
+.dati-rapidi .ico svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.dati-rapidi strong { font-family: var(--mono); font-size: .98rem; }
+.tab-quantita td { font-family: var(--mono); font-size: .8rem; }
+.tab-quantita tr.corrente td { color: var(--acc); }
+.viewer-lato { margin: 0 0 1.1rem; }
+.viewer-lato .viewer3d { height: 250px; }
+.viewer-didascalia { margin: .45rem 0 0; font-family: var(--mono); font-size: .68rem; letter-spacing: .04em; text-align: center; color: var(--muted); }
+.file-step.solo-dati { grid-template-columns: minmax(0, 1fr); }
+.viewer3d { background-image: linear-gradient(rgba(120, 170, 255, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(120, 170, 255, .07) 1px, transparent 1px), radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--acc) 14%, var(--bg)), var(--bg-2)); background-size: 26px 26px, 26px 26px, auto; }
+
+/* Vista azienda: indicatori */
+.kpi { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.kpi-tessera { padding: 1.1rem 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(165deg, color-mix(in srgb, var(--card) 90%, var(--blu)) 0%, var(--card) 70%); }
+.kpi-etichetta { display: block; font-family: var(--mono); font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.kpi-valore { display: block; margin-top: .45rem; font-family: var(--mono); font-size: clamp(1.35rem, 2.3vw, 1.95rem); font-weight: 700; color: var(--titolo); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.az-banner { background: color-mix(in srgb, var(--acc) 8%, var(--bg)); border-color: color-mix(in srgb, var(--acc) 30%, transparent); }
+.id-con-led { display: inline-flex; align-items: center; gap: .55rem; }
+.az-voce .led { width: 8px; height: 8px; background: var(--c, var(--acc)); animation: none; box-shadow: 0 0 10px -2px var(--c, var(--acc)); }
+.led-ricevuta { --c: var(--acc); }
+.led-in-valutazione { --c: #fbbf24; }
+.led-offerta-inviata { --c: var(--ok); }
+.az-voce[aria-current="true"] { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc), 0 0 26px -12px var(--acc); }
+
+/* Percorso della richiesta */
+.pipeline { display: flex; list-style: none; padding: 0; margin: 1.1rem 0 1.2rem; }
+.pipeline li { flex: 1; display: flex; align-items: center; gap: .6rem; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.pipeline li:last-child { flex: none; }
+.pipeline li:not(:last-child)::after { content: ""; flex: 1; height: 1px; margin: 0 .9rem; background: var(--line); }
+.pip-punto { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border: 1px solid var(--line); border-radius: 50%; font-family: var(--mono); font-size: .72rem; }
+.pip-nome { white-space: nowrap; }
+.pipeline li.fatto { color: var(--ok); }
+.pipeline li.fatto .pip-punto { background: var(--ok); border-color: var(--ok); color: #03140b; }
+.pipeline li.fatto:not(:last-child)::after { background: var(--ok); }
+.pipeline li.attuale { color: var(--titolo); }
+.pipeline li.attuale .pip-punto { border-color: var(--acc); color: var(--acc); box-shadow: 0 0 16px -4px var(--acc); }
+
+/* Anteprima della mail al cliente */
+.mail { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+.mail-testa { display: grid; gap: .35rem; padding: .85rem 1rem; background: var(--bg-2); border-bottom: 1px solid var(--line); font-size: .85rem; }
+.mail-riga { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: .6rem; }
+.mail-riga span { color: var(--muted); }
+.mail-riga strong { font-weight: 600; overflow-wrap: anywhere; }
+.mail-corpo { padding: 1.1rem 1.25rem; white-space: pre-line; font-size: .95rem; line-height: 1.65; }
+
+/* Avviso di conferma (al posto delle finestre del browser) */
+.toast-area { position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 90; display: grid; gap: .6rem; }
+.toast { display: flex; align-items: center; gap: .75rem; max-width: min(92vw, 380px); padding: .85rem 1.15rem; font-size: .9rem; color: var(--ink); background: var(--card); border: 1px solid color-mix(in srgb, var(--ok) 55%, transparent); border-radius: 10px; box-shadow: var(--ombra), 0 0 30px -10px var(--ok); animation: toast-su .35s ease both; }
+.toast.esce { animation: toast-giu .4s ease both; }
+.toast-icona { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--ok); color: #03140b; font-weight: 800; }
+@keyframes toast-su { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes toast-giu { to { opacity: 0; transform: translateY(14px); } }
+
+@media (max-width: 1049.98px) {
+  .kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 440px) {
+  .cfg-passo + .cfg-passo { margin-left: 1.1rem; }
+  .cfg-passo + .cfg-passo::before { left: -1.1rem; width: 1.1rem; }
+  .reparto-card { grid-template-columns: auto minmax(0, 1fr); padding: 1.1rem; }
+  .rc-freccia { display: none; }
+  .rc-icona { width: 46px; height: 46px; }
+  .kpi { gap: .7rem; }
+  .kpi-tessera { padding: .9rem 1rem; }
+  .pipeline { gap: .4rem; }
+  .pipeline li, .pipeline li:last-child { flex: 1 1 0; min-width: 0; flex-direction: column; align-items: flex-start; gap: .4rem; }
+  .pipeline li:not(:last-child)::after { display: none; }
+  .pip-nome { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; font-size: .7rem; }
+  .mail-riga { grid-template-columns: minmax(0, 1fr); gap: .1rem; }
+  .toast-area { left: 1rem; right: 1rem; bottom: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .led, .toast, .toast.esce { animation: none; }
+}

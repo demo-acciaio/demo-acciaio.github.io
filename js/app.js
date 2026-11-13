@@ -30,6 +30,36 @@
   }
 
   /* ---------- Utilita' ---------- */
+  var mqAffiancato = window.matchMedia("(min-width: 1050px), (min-width: 760px) and (max-width: 1049.98px) and (orientation: landscape)");
+  function affiancato() { return mqAffiancato.matches; } // modulo e prezzo su due colonne?
+  var seqPrezzo = 0;
+  // Fa scorrere un numero da "da" ad "a" (con la funzione "fmt" per scriverlo)
+  function animaValore(e, da, a, ms, fmt, soloUltima) {
+    if (da === a || matchMedia("(prefers-reduced-motion: reduce)").matches) { e.textContent = fmt(a); return; }
+    var mio = soloUltima ? ++seqPrezzo : 0, t0 = null;
+    function passo(ora) {
+      if (soloUltima && mio !== seqPrezzo) return; // e' partita un'animazione piu' recente
+      if (t0 === null) t0 = ora;
+      var p = Math.min(1, (ora - t0) / ms), k = 1 - Math.pow(1 - p, 3);
+      e.textContent = fmt(da + (a - da) * k);
+      if (p < 1) requestAnimationFrame(passo);
+    }
+    requestAnimationFrame(passo);
+  }
+  // Piccole icone fisse (disegni, nessun dato dell'utente)
+  var ICO = {
+    consegna: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v9H2zM13 9h4l3 3v3h-7z"/><circle cx="6.5" cy="17" r="1.8"/><circle cx="16.5" cy="17" r="1.8"/></svg>',
+    ore: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    peso: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M6 20h12M5 8h14M5 8l-3 7a3 3 0 0 0 6 0zM19 8l-3 7a3 3 0 0 0 6 0z"/></svg>'
+  };
+  function icona(nome) { var s = el("span", { class: "ico" }); s.innerHTML = ICO[nome]; return s; }
+  function mostraToast(testo) {
+    var area = document.getElementById("toast-area");
+    if (!area) { area = el("div", { id: "toast-area", class: "toast-area", role: "status", "aria-live": "polite" }); document.body.appendChild(area); }
+    var tt = el("div", { class: "toast" }, el("span", { class: "toast-icona", "aria-hidden": "true", text: "✓" }), el("span", { text: testo }));
+    area.appendChild(tt);
+    setTimeout(function () { tt.classList.add("esce"); setTimeout(function () { if (tt.parentNode) tt.parentNode.removeChild(tt); }, 450); }, 3400);
+  }
   function el(tag, attrs) {
     var e = document.createElement(tag);
     if (attrs) {
@@ -165,7 +195,7 @@
   }
 
   /* ---------- Stato del configuratore ---------- */
-  var cfg = { passo: 1, dati: null, contatti: { azienda: "", nome: "", email: "", telefono: "", note: "" }, accetta: false, errori: {}, inviata: null, file: null, tokenFile: 0 };
+  var cfg = { ultimoTotale: null, passo: 1, dati: null, contatti: { azienda: "", nome: "", email: "", telefono: "", note: "" }, accetta: false, errori: {}, inviata: null, file: null, tokenFile: 0 };
   var radice = null;      // contenitore #configuratore-app
   var pannelloPrezzo = null;
 
@@ -406,6 +436,9 @@
   }
   function testoErrore(e) { return (e.nome ? "«" + e.nome + "»: " : "") + t(e.k); }
 
+  function testoAttesa3d(f) {
+    return f.viewerErrore ? (f.viewerErrore.indexOf("f.err.") === 0 ? t(f.viewerErrore) : t("f.err.generico")) : t("s.preparo3d");
+  }
   function esitoFile(f) {
     var out = el("div", { class: "file-esito stack", "aria-live": "polite" });
     if (f.caricamento) { out.appendChild(el("p", { class: "aiuto", text: t("f.leggo", { nomi: f.nomi.join(" + ") }) })); return out; }
@@ -419,10 +452,14 @@
         el("div", null, el("dt", { text: t("s.ingombro") }), el("dd", { text: f.step.ingombro.map(function (n) { return num(n); }).join(" × ") + " mm" })),
         el("div", null, el("dt", { text: t("s.volume") }), el("dd", { text: num(f.step.volume) + " cm³" })),
         peso ? el("div", null, el("dt", { text: t("s.peso_in", { mat: nm("mat", mat) }) }), el("dd", { text: num(Math.round(peso * 1000) / 1000) + " kg" })) : null);
-      var attesa = f.viewerErrore ? (f.viewerErrore.indexOf("f.err.") === 0 ? t(f.viewerErrore) : t("f.err.generico")) : t("s.preparo3d");
-      var vis = f.viewer ? f.viewer.el : el("div", { class: "viewer3d viewer-attesa", text: attesa });
-      out.appendChild(el("div", { class: "file-step" }, vis, el("div", null, dati,
-        el("p", { class: "aiuto", text: f.volumeIgnorato ? t("s.misure_cambiate") : t("s.misure_inserite") }))));
+      var nota = el("p", { class: "aiuto", text: f.volumeIgnorato ? t("s.misure_cambiate") : t("s.misure_inserite") });
+      if (affiancato()) {
+        // il pezzo 3D sta nella colonna del prezzo, sempre in vista mentre si sceglie: qui solo i dati
+        out.appendChild(el("div", { class: "file-step solo-dati" }, el("div", null, dati, nota)));
+      } else {
+        var vis = f.viewer ? f.viewer.el : el("div", { class: "viewer3d viewer-attesa", text: testoAttesa3d(f) });
+        out.appendChild(el("div", { class: "file-step" }, vis, el("div", null, dati, nota)));
+      }
     }
     if (f.pdf) {
       var pdfBox = el("div", { class: "file-pdf" }, f.pdf.canvas);
@@ -443,15 +480,17 @@
     var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p1.titolo") }));
     var griglia = el("div", { class: "reparto-scelta" });
     REPARTI.forEach(function (r) {
-      griglia.appendChild(el("button", { type: "button", class: "scelta", "aria-pressed": "false", onclick: function () { scegliReparto(r); } },
-        repNome(r), el("small", { text: t("rep." + r + ".desc") })));
+      var ic = el("span", { class: "rc-icona" }); ic.innerHTML = ICONE[r]; // disegni fissi
+      griglia.appendChild(el("button", { type: "button", class: "reparto-card", onclick: function () { scegliReparto(r); } },
+        ic, el("span", { class: "rc-testo" }, el("span", { class: "rc-nome", text: repNome(r) }), el("span", { class: "rc-desc", text: t("rep." + r + ".desc") })),
+        el("span", { class: "rc-freccia", "aria-hidden": "true", text: "→" })));
     });
     box.appendChild(griglia);
     return box;
   }
   function scegliReparto(id, saltaScroll) {
     scartaFile();
-    cfg.dati = nuoviDati(id); cfg.inviata = null; cfg.errori = {};
+    cfg.dati = nuoviDati(id); cfg.inviata = null; cfg.errori = {}; cfg.ultimoTotale = null;
     vaiPasso(2);
     if (!saltaScroll) vaiA("configuratore");
   }
@@ -531,7 +570,7 @@
   }
 
   /* ---------- Pannello prezzo ---------- */
-  var COLORI = { materiale: "#0069b4", lavorazione: "#263272", attrezzaggio: "#5b8fd6", finitura: "#7a8bb5", collaudo: "#9bb7e0", urgenza: "#d98b1f", margine: "#8f9ab5" };
+  var COLORI = { materiale: "#3b9bff", lavorazione: "#22d3ee", attrezzaggio: "#818cf8", finitura: "#c084fc", collaudo: "#34d399", urgenza: "#fbbf24", margine: "#94a3b8" };
 
   function pannelloPrezzoDOM(d, opz) {
     opz = opz || {};
@@ -542,7 +581,12 @@
       box.appendChild(el("div", { class: "avviso avviso-errore", role: "status", text: msg(c.errore) }));
       return { dom: box, calc: c };
     }
-    box.appendChild(el("div", { class: "prezzo-grande", text: eur(c.da) + " – " + eur(c.a) }));
+    // Numero grande: il totale calcolato. Nel configuratore scorre dal valore precedente a quello nuovo.
+    var parte = opz.anima && cfg.ultimoTotale !== null && cfg.ultimoTotale !== undefined ? cfg.ultimoTotale : c.totale;
+    var grande = el("div", { class: "prezzo-grande", text: eur(parte) });
+    box.appendChild(el("div", { class: "prezzo-hero" }, grande, el("p", { class: "prezzo-range", text: t("pz.range", { da: eur(c.da), a: eur(c.a) }) })));
+    if (opz.anima) { animaValore(grande, parte, c.totale, 450, function (n) { return eur(n); }, true); cfg.ultimoTotale = c.totale; }
+    else grande.textContent = eur(c.totale);
     box.appendChild(el("p", { class: "prezzo-sotto", text: t("pz.per", { q: c.quantita, pezzo: eur(c.perPezzo) }) }));
 
     var tot = 0; Object.keys(c.voci).forEach(function (k) { tot += c.voci[k]; });
@@ -550,14 +594,15 @@
     Object.keys(c.voci).forEach(function (k) { if (c.voci[k] > 0) barra.appendChild(el("i", { style: "width:" + (c.voci[k] / tot * 100) + "%;background:" + COLORI[k] })); });
     box.appendChild(barra);
     var vociLista = el("ul", { class: "voci" });
-    Object.keys(c.voci).forEach(function (k) { if (c.voci[k] > 0) vociLista.appendChild(el("li", null, el("span", { text: t("pz.v." + k) }), el("span", { text: eur(c.voci[k]) }))); });
-    vociLista.appendChild(el("li", null, el("strong", { text: t("pz.totale") }), el("strong", { text: eur(c.totale) })));
+    Object.keys(c.voci).forEach(function (k) {
+      if (c.voci[k] > 0) vociLista.appendChild(el("li", { style: "--col:" + COLORI[k] }, el("span", { class: "voce-nome" }, el("i", { class: "punto" }), t("pz.v." + k)), el("span", { text: eur(c.voci[k]) })));
+    });
     box.appendChild(vociLista);
 
     box.appendChild(el("div", { class: "dati-rapidi" },
-      el("div", null, el("strong", { text: "~" + c.giorni + " " + t("u.gg") }), el("span", { text: t("pz.consegna") })),
-      el("div", null, el("strong", { text: num(c.ore) + " h" }), el("span", { text: t("pz.lavorazione") })),
-      el("div", null, el("strong", { text: c.pesoPezzoKg ? num(c.pesoPezzoKg) + " kg" : "—" }), el("span", { text: t("pz.peso") }))));
+      el("div", null, icona("consegna"), el("strong", { text: "~" + c.giorni + " " + t("u.gg") }), el("span", { text: t("pz.consegna") })),
+      el("div", null, icona("ore"), el("strong", { text: num(c.ore) + " h" }), el("span", { text: t("pz.lavorazione") })),
+      el("div", null, icona("peso"), el("strong", { text: c.pesoPezzoKg ? num(c.pesoPezzoKg) + " kg" : "—" }), el("span", { text: t("pz.peso") }))));
 
     if (!opz.senzaTabella) {
       var quantita = [1, 10, 25, 50, 100, 250, 500];
@@ -578,7 +623,7 @@
   }
   function disegnaPrezzo() {
     if (!pannelloPrezzo) return;
-    var r = pannelloPrezzoDOM(cfg.dati);
+    var r = pannelloPrezzoDOM(cfg.dati, { anima: true });
     svuota(pannelloPrezzo.corpo); pannelloPrezzo.corpo.appendChild(r.dom);
     var b = document.getElementById("btn-avanti"); if (b) b.disabled = !!r.calc.errore;
   }
@@ -671,7 +716,16 @@
     else if (cfg.passo === 2) {
       griglia.appendChild(passoDettagli());
       var corpo = el("div");
-      var side = el("aside", { class: "card prezzo", "aria-label": t("pz.stima") }, el("h3", { text: t("pz.stima") }), corpo);
+      var testa = el("div", { class: "prezzo-testa" }, el("span", { class: "led", "aria-hidden": "true" }), el("h3", { text: t("pz.stima") }), el("span", { class: "live", "aria-hidden": "true", text: "LIVE" }));
+      var side = el("aside", { class: "card prezzo cockpit", "aria-label": t("pz.stima") }, testa);
+      if (affiancato() && cfg.file && cfg.file.step) {
+        var vistaLato = el("div", { class: "viewer-lato" });
+        if (cfg.file.viewer) vistaLato.appendChild(cfg.file.viewer.el);
+        else vistaLato.appendChild(el("div", { class: "viewer3d viewer-attesa", text: testoAttesa3d(cfg.file) }));
+        vistaLato.appendChild(el("p", { class: "viewer-didascalia", text: t("s.ruota") }));
+        side.appendChild(vistaLato);
+      }
+      side.appendChild(corpo);
       pannelloPrezzo = { corpo: corpo };
       griglia.appendChild(side);
     } else if (cfg.passo === 3) griglia.appendChild(passoInvio());
@@ -684,7 +738,7 @@
   /* ==========================================================================
      VISTA AZIENDA
      ========================================================================== */
-  var az = { tab: "richieste", sel: null, viewer: null, tokenViewer: 0 };
+  var az = { tab: "richieste", sel: null, viewer: null, tokenViewer: 0, kpiAnimati: false, dentro: false };
   var VERSIONE_ESEMPI = 3; // aumentare quando cambiano le richieste di esempio in seedRichieste
 
   function seedRichieste() {
@@ -719,6 +773,43 @@
     return t("r.testo", { nome: rec.cliente.nome, id: rec.id, q: q, pezzo: titoloPezzo(rec.dati, l), tot: eur(offertaTot, l), per: eur(offertaTot / q, l), giorni: calc.giorni }, l);
   }
 
+  // Indicatori in alto: richieste, da valutare, valore stimato, offerte inviate (si contano da soli alla prima apertura)
+  function kpiAzienda(lista) {
+    var valore = lista.reduce(function (s, r) { return s + (r.prezzo && r.prezzo.totale ? r.prezzo.totale : 0); }, 0);
+    var voci = [
+      { k: "totale", v: lista.length, fmt: function (n) { return String(Math.round(n)); } },
+      { k: "attesa", v: lista.filter(function (r) { return r.stato === "ricevuta"; }).length, fmt: function (n) { return String(Math.round(n)); } },
+      { k: "valore", v: valore, fmt: function (n) { return eur(n); } },
+      { k: "inviate", v: lista.filter(function (r) { return r.stato === "offerta-inviata"; }).length, fmt: function (n) { return String(Math.round(n)); } }
+    ];
+    var box = el("div", { class: "kpi" });
+    voci.forEach(function (x) {
+      var numero = el("strong", { class: "kpi-valore", text: x.fmt(az.kpiAnimati ? x.v : 0) });
+      box.appendChild(el("div", { class: "kpi-tessera" }, el("span", { class: "kpi-etichetta", text: t("az.kpi." + x.k) }), numero));
+      if (!az.kpiAnimati) animaValore(numero, 0, x.v, 1100, x.fmt, false);
+    });
+    az.kpiAnimati = true;
+    return box;
+  }
+  // Percorso della richiesta: Ricevuta -> In valutazione -> Offerta inviata
+  function pipeline(stato) {
+    var idx = STATI.indexOf(stato), ol = el("ol", { class: "pipeline" });
+    STATI.forEach(function (s, i) {
+      ol.appendChild(el("li", { class: i < idx ? "fatto" : (i === idx ? "attuale" : ""), "aria-current": i === idx ? "step" : null },
+        el("span", { class: "pip-punto", text: i < idx ? "✓" : String(i + 1) }), el("span", { class: "pip-nome", text: t("stato." + s) })));
+    });
+    return ol;
+  }
+  // Anteprima della mail al cliente, scritta nella SUA lingua
+  function mailAnteprima(rec, calc, tot) {
+    var l = rec.lingua || "it";
+    return el("div", { class: "mail" },
+      el("div", { class: "mail-testa" },
+        el("div", { class: "mail-riga" }, el("span", { text: t("az.mail.a", null, l) }), el("strong", { text: rec.cliente.nome + " <" + rec.cliente.email + ">" })),
+        el("div", { class: "mail-riga" }, el("span", { text: t("az.mail.oggetto", null, l) }), el("strong", { text: t("r.oggetto", { id: rec.id, pezzo: titoloPezzo(rec.dati, l) }, l) }))),
+      el("div", { class: "mail-corpo", text: rispostaAutomatica(rec, calc, tot) }));
+  }
+
   function disegnaAzienda() {
     var cont = document.getElementById("vista-azienda"); svuota(cont);
     if (az.viewer) { az.viewer.dispose(); az.viewer = null; }
@@ -730,6 +821,7 @@
       el("div", { class: "az-azioni", style: "margin:0" },
         bottoneAzzera("btn btn-ghost btn-sm"),
         el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { location.hash = "#/"; } }, t("az.torna")))));
+    wrap.appendChild(kpiAzienda(lista));
     wrap.appendChild(el("div", { class: "az-banner", text: t("az.banner") }));
     var tabs = el("div", { class: "az-tabs", role: "tablist" });
     [["richieste", t("az.tab.richieste", { n: lista.length })], ["schedario", t("az.tab.schedario")]].forEach(function (tb) {
@@ -747,7 +839,7 @@
     var elenco = el("div", { class: "az-elenco" });
     ordinate.forEach(function (r) {
       elenco.appendChild(el("button", { type: "button", class: "az-voce", "aria-current": String(r.id === az.sel), onclick: function () { az.sel = r.id; history.replaceState(null, "", "#/azienda/" + r.id); disegnaAzienda(); } },
-        el("span", { class: "riga" }, el("span", { class: "id", text: r.id }), el("span", { text: dataBreve(r.creata) })),
+        el("span", { class: "riga" }, el("span", { class: "id-con-led" }, el("span", { class: "led led-" + r.stato, "aria-hidden": "true" }), el("span", { class: "id", text: r.id })), el("span", { text: dataBreve(r.creata) })),
         el("span", { class: "riga" }, el("span", { text: r.cliente.azienda || r.cliente.nome })),
         el("span", { class: "riga" }, el("span", { text: repNome(r.dati.reparto) + " · " + r.dati.quantita + " " + t("u.pz") }), el("strong", { text: eur(r.prezzo.totale) })),
         el("span", { class: "riga" }, el("span", { class: "badge " + (r.stato === "offerta-inviata" ? "badge-ok" : "badge-blu"), text: t("stato." + r.stato) }), el("span", { class: "lingua-cliente", text: (r.lingua || "it").toUpperCase(), title: t("az.lingua_cliente") }))));
@@ -760,6 +852,7 @@
     var box = el("div", { class: "card az-dettaglio" });
     box.appendChild(el("h3", { text: rec.id + " · " + (rec.cliente.azienda || rec.cliente.nome) }));
     box.appendChild(el("p", { class: "aiuto", text: rec.cliente.nome + " · " + rec.cliente.email + (rec.cliente.telefono ? " · " + rec.cliente.telefono : "") }));
+    box.appendChild(pipeline(rec.stato));
     if (rec.cliente.note) box.appendChild(el("p", { text: t("az.note_cliente") + ": " + rec.cliente.note }));
 
     var sez1 = el("div", { class: "az-sezione" }, el("h4", { text: t("az.chiesto") }));
@@ -788,14 +881,15 @@
         el("span", { style: "min-width:4rem", text: (rec.ritocco > 0 ? "+" : "") + rec.ritocco + "%" }),
         el("button", { type: "button", "aria-label": t("a.aumenta1"), onclick: function () { rec.ritocco = Math.min(30, rec.ritocco + 1); salvaRichiesta(rec); disegnaAzienda(); } }, "+")),
       el("strong", { text: t("az.offerta", { tot: eur(offertaTot) }) })));
-    sez3.appendChild(el("div", { class: "risposta", text: rispostaAutomatica(rec, calc, offertaTot) }));
+    sez3.appendChild(mailAnteprima(rec, calc, offertaTot));
     sez3.appendChild(el("div", { class: "az-azioni" },
-      rec.stato !== "in-valutazione" && rec.stato !== "offerta-inviata" ? el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { rec.stato = "in-valutazione"; salvaRichiesta(rec); disegnaAzienda(); } }, t("az.segna")) : null,
+      rec.stato !== "in-valutazione" && rec.stato !== "offerta-inviata" ? el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { rec.stato = "in-valutazione"; salvaRichiesta(rec); disegnaAzienda(); mostraToast(t("az.toast.valutazione", { id: rec.id })); } }, t("az.segna")) : null,
       rec.stato === "offerta-inviata"
         ? el("span", { class: "badge badge-ok", text: t("az.inviata") + (rec.offerta ? " · " + eur(rec.offerta.totale) : "") })
         : el("button", { type: "button", class: "btn btn-primario btn-sm", onclick: function () {
             rec.stato = "offerta-inviata"; rec.offerta = { totale: offertaTot, giorni: calc.giorni, data: new Date().toISOString() };
             salvaRichiesta(rec); disegnaAzienda();
+            mostraToast(t("az.toast.inviata", { id: rec.id, nome: rec.cliente.nome }));
           } }, t("az.invia"))));
     box.appendChild(sez3);
     return box;
@@ -865,9 +959,9 @@
     });
     ripristinaSchedario();
     scartaFile();
-    cfg.passo = 1; cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.errori = {};
+    cfg.passo = 1; cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.errori = {}; cfg.ultimoTotale = null;
     cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" };
-    az.sel = null; az.tab = "richieste";
+    az.sel = null; az.tab = "richieste"; az.kpiAnimati = false;
     seedRichieste();
     try { history.replaceState({ cfgPasso: 1 }, "", location.pathname + location.search + "#/"); } catch (e) { /* ok */ }
     disegna(); route();
@@ -908,9 +1002,12 @@
     document.getElementById("vista-azienda").hidden = !inAzienda;
     etichetteNav(inAzienda);
     if (inAzienda) {
+      if (!az.dentro) az.kpiAnimati = false; // entrando nella vista azienda gli indicatori si contano da zero
+      az.dentro = true;
       var m = h.match(/^#\/azienda\/(RIC-\d+)/); if (m) { az.sel = m[1]; az.tab = "richieste"; }
       disegnaAzienda(); window.scrollTo(0, 0);
     } else if (h.length > 2 && h.charAt(1) !== "/") {
+      az.dentro = false;
       setTimeout(function () { vaiA(h.slice(1)); }, 0);
     } else { window.scrollTo(0, 0); }
     document.getElementById("menu").classList.remove("aperto");
@@ -1029,6 +1126,9 @@
       });
     });
     window.addEventListener("hashchange", route);
+    // Se cambia la disposizione (es. iPad che ruota) il pezzo 3D cambia posto: ridisegna il passo 2
+    var cambioDisposizione = function () { if (cfg.passo === 2 && radice) disegna(); };
+    if (mqAffiancato.addEventListener) mqAffiancato.addEventListener("change", cambioDisposizione); else mqAffiancato.addListener(cambioDisposizione);
     // Freccia indietro / tasto indietro del mouse: si torna al passo precedente del configuratore
     window.addEventListener("popstate", function (ev) {
       var s = ev.state;
