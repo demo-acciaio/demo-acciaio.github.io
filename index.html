@@ -20,27 +20,29 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Archivo:wght@800&display=swap" rel="stylesheet">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
 
 <header class="top" id="top">
-  <a class="logo" href="#/" aria-label="Home">
+  <a class="logo" href="#/" data-i18n-attr="aria-label:nav.home" aria-label="Home">
     <img class="logo-chiaro" src="img/logo.svg" alt="Artigiancavi" height="40">
     <img class="logo-scuro" src="img/logo-bianco.svg" alt="" height="40">
   </a>
-  <nav class="menu" id="menu" aria-label="Principale">
-    <a href="#reparti" data-vai="reparti">Lavorazioni</a>
-    <a href="#come" data-vai="come">Come funziona</a>
-    <a href="#configuratore" data-vai="configuratore">Configuratore</a>
+  <nav class="menu" id="menu" data-i18n-attr="aria-label:nav.principale" aria-label="Principale">
+    <a href="#reparti" data-vai="reparti" data-i18n="nav.lavorazioni">Lavorazioni</a>
+    <a href="#come" data-vai="come" data-i18n="nav.come">Come funziona</a>
+    <a href="#configuratore" data-vai="configuratore" data-i18n="nav.configuratore">Configuratore</a>
+    <div class="lingue lingue-menu" data-lingue role="group" data-i18n-attr="aria-label:lang.scelta" aria-label="Lingua"></div>
     <a href="#/azienda" id="menu-azienda" class="voce-azienda">Vista azienda</a>
   </nav>
   <div class="top-azioni">
+    <div class="lingue lingue-testa" data-lingue role="group" data-i18n-attr="aria-label:lang.scelta" aria-label="Lingua"></div>
     <button class="btn btn-ghost btn-sm" id="btn-vista-azienda" type="button">Vista azienda</button>
-    <button class="icona" id="btn-tema" type="button" aria-label="Cambia tema chiaro/scuro">
+    <button class="icona" id="btn-tema" type="button" data-i18n-attr="aria-label:tema.cambia" aria-label="Cambia tema chiaro/scuro">
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A6 6 0 0 1 12.4 3.1 9 9 0 0 0 12 3z"/></svg>
     </button>
-    <button class="icona solo-mobile" id="btn-menu" type="button" aria-label="Apri il menu" aria-expanded="false">
+    <button class="icona solo-mobile" id="btn-menu" type="button" data-i18n-attr="aria-label:menu.apri" aria-label="Apri il menu" aria-expanded="false">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </button>
   </div>
@@ -51,55 +53,55 @@
   <section class="hero">
     <div class="hero-griglia" aria-hidden="true"></div>
     <div class="contenitore hero-testo">
-      <p class="sopratitolo">Lavorazioni meccaniche di precisione · Trento</p>
-      <h1>Configura il tuo pezzo.<br><span class="contorno">Ricevi subito il prezzo.</span></h1>
-      <p class="lead">Tornitura, fresatura, cavi e trasmissioni flessibili, assemblaggi: su disegno, in piccole e medie serie. Descrivi il pezzo o carica il file e ottieni una stima immediata, con il dettaglio dei costi.</p>
+      <p class="sopratitolo" data-i18n="hero.sopra">Lavorazioni meccaniche di precisione · Trento</p>
+      <h1><span data-i18n="hero.t1">Configura il tuo pezzo.</span><br><span class="contorno" data-i18n="hero.t2">Ricevi subito il prezzo.</span></h1>
+      <p class="lead" data-i18n="hero.lead">Tornitura, fresatura, cavi e trasmissioni flessibili, assemblaggi: su disegno, in piccole e medie serie. Descrivi il pezzo o carica il file e ottieni una stima immediata, con il dettaglio dei costi.</p>
       <div class="hero-bottoni">
-        <a class="btn btn-primario" href="#configuratore" data-vai="configuratore">Configura e richiedi offerta <span aria-hidden="true">→</span></a>
-        <a class="btn btn-contorno" href="#reparti" data-vai="reparti">Scopri le lavorazioni</a>
+        <a class="btn btn-primario" href="#configuratore" data-vai="configuratore"><span data-i18n="hero.cta1">Configura e richiedi offerta</span> <span aria-hidden="true">→</span></a>
+        <a class="btn btn-contorno" href="#reparti" data-vai="reparti" data-i18n="hero.cta2">Scopri le lavorazioni</a>
       </div>
       <ul class="hero-punti">
-        <li><strong>40+</strong> anni di esperienza</li>
-        <li><strong>25</strong> centri di tornitura e fresatura</li>
-        <li><strong>3D</strong> misura e collaudo interni</li>
+        <li><strong>40+</strong> <span data-i18n="hero.p1">anni di esperienza</span></li>
+        <li><strong>25</strong> <span data-i18n="hero.p2">centri di tornitura e fresatura</span></li>
+        <li><strong>3D</strong> <span data-i18n="hero.p3">misura e collaudo interni</span></li>
       </ul>
     </div>
   </section>
 
   <section class="sezione" id="reparti">
     <div class="contenitore">
-      <p class="sopratitolo">Lavorazioni</p>
-      <h2>Quattro reparti, un solo configuratore</h2>
+      <p class="sopratitolo" data-i18n="rep.sopra">Lavorazioni</p>
+      <h2 data-i18n="rep.titolo">Quattro reparti, un solo configuratore</h2>
       <div class="reparti" id="griglia-reparti"></div>
     </div>
   </section>
 
   <section class="sezione sezione-grigia" id="come">
     <div class="contenitore">
-      <p class="sopratitolo">Come funziona</p>
-      <h2>Dalla richiesta all'offerta in tre passi</h2>
+      <p class="sopratitolo" data-i18n="come.sopra">Come funziona</p>
+      <h2 data-i18n="come.titolo">Dalla richiesta all'offerta in tre passi</h2>
       <ol class="passi">
-        <li><span class="passo-n">1</span><h3>Descrivi il pezzo</h3><p>Scegli il reparto, il materiale e le misure. Puoi caricare il disegno in formato STEP o PDF.</p></li>
-        <li><span class="passo-n">2</span><h3>Vedi la stima</h3><p>Il prezzo si aggiorna mentre scegli: materiale, lavorazione, attrezzaggio, finiture e tempi di consegna.</p></li>
-        <li><span class="passo-n">3</span><h3>Ricevi l'offerta</h3><p>L'ufficio verifica il disegno e conferma l'offerta ufficiale. La stima non è vincolante.</p></li>
+        <li><span class="passo-n">1</span><h3 data-i18n="come.1.t">Descrivi il pezzo</h3><p data-i18n="come.1.p">Scegli il reparto, il materiale e le misure. Puoi caricare il disegno in formato STEP o PDF.</p></li>
+        <li><span class="passo-n">2</span><h3 data-i18n="come.2.t">Vedi la stima</h3><p data-i18n="come.2.p">Il prezzo si aggiorna mentre scegli: materiale, lavorazione, attrezzaggio, finiture e tempi di consegna.</p></li>
+        <li><span class="passo-n">3</span><h3 data-i18n="come.3.t">Ricevi l'offerta</h3><p data-i18n="come.3.p">L'ufficio verifica il disegno e conferma l'offerta ufficiale. La stima non è vincolante.</p></li>
       </ol>
     </div>
   </section>
 
   <section class="sezione sezione-blu" id="numeri">
     <div class="contenitore numeri">
-      <div><strong>14+</strong><span>centri di tornitura</span></div>
-      <div><strong>11</strong><span>centri di fresatura</span></div>
-      <div><strong>7</strong><span>isole di assemblaggio</span></div>
-      <div><strong>2</strong><span>macchine di misura 3D</span></div>
+      <div><strong>14+</strong><span data-i18n="num.1">centri di tornitura</span></div>
+      <div><strong>11</strong><span data-i18n="num.2">centri di fresatura</span></div>
+      <div><strong>7</strong><span data-i18n="num.3">isole di assemblaggio</span></div>
+      <div><strong>2</strong><span data-i18n="num.4">macchine di misura 3D</span></div>
     </div>
   </section>
 
   <section class="sezione" id="configuratore">
     <div class="contenitore">
-      <p class="sopratitolo">Configuratore</p>
-      <h2>Richiedi un'offerta</h2>
-      <p class="intro">Il prezzo mostrato è indicativo e calcolato sui costi di esempio di questa demo. L'offerta ufficiale viene preparata dopo la verifica del disegno.</p>
+      <p class="sopratitolo" data-i18n="cfg.sopra">Configuratore</p>
+      <h2 data-i18n="cfg.titolo">Richiedi un'offerta</h2>
+      <p class="intro" data-i18n="cfg.intro">Il prezzo mostrato è indicativo e calcolato sui costi di esempio di questa demo. L'offerta ufficiale viene preparata dopo la verifica del disegno.</p>
       <div id="configuratore-app"></div>
     </div>
   </section>
@@ -110,13 +112,15 @@
 
 <footer class="piede">
   <div class="contenitore">
-    <p><strong>Demo dimostrativa.</strong> Prezzi, tempi e dati sono di esempio e non rappresentano offerte reali. I file caricati restano nel tuo browser e non vengono inviati a nessun server. <span id="azzera-slot"></span></p>
+    <p><strong data-i18n="piede.forte">Demo dimostrativa.</strong> <span data-i18n="piede.testo">Prezzi, tempi e dati sono di esempio e non rappresentano offerte reali. I file caricati restano nel tuo browser e non vengono inviati a nessun server.</span> <span id="azzera-slot"></span></p>
   </div>
 </footer>
 
-<script src="js/schedario.js?v=10"></script>
-<script src="js/prezzi.js?v=10"></script>
-<script src="js/file.js?v=10"></script>
-<script src="js/app.js?v=10"></script>
+<script src="js/schedario.js?v=15"></script>
+<script src="js/prezzi.js?v=15"></script>
+<script src="js/testi.js?v=15"></script>
+<script src="js/i18n.js?v=15"></script>
+<script src="js/file.js?v=15"></script>
+<script src="js/app.js?v=15"></script>
 </body>
 </html>

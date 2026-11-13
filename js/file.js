@@ -20,7 +20,7 @@
       var s = document.createElement("script");
       s.src = src; s.async = true;
       s.onload = function () { ok(); };
-      s.onerror = function () { delete cacheScript[src]; ko(new Error("Non riesco a scaricare gli strumenti di lettura dei file. Controlla la connessione e riprova.")); };
+      s.onerror = function () { delete cacheScript[src]; ko(new Error("f.err.scarico")); };
       document.head.appendChild(s);
     });
     return cacheScript[src];
@@ -42,8 +42,8 @@
   function leggiStep(buffer) {
     return occt().then(function (o) {
       var res;
-      try { res = o.ReadStepFile(new Uint8Array(buffer), null); } catch (e) { throw new Error("Il file STEP non è leggibile."); }
-      if (!res || !res.success || !res.meshes || !res.meshes.length) throw new Error("Il file STEP non contiene un solido leggibile.");
+      try { res = o.ReadStepFile(new Uint8Array(buffer), null); } catch (e) { throw new Error("f.err.step_illeggibile"); }
+      if (!res || !res.success || !res.meshes || !res.meshes.length) throw new Error("f.err.step_vuoto");
       var min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity], vol = 0;
       res.meshes.forEach(function (m) {
         var p = m.attributes.position.array, idx = m.index.array, i;
@@ -58,7 +58,7 @@
       });
       var ing = [arr(max[0] - min[0]), arr(max[1] - min[1]), arr(max[2] - min[2])];
       var volCm3 = Math.abs(vol) / 6 / 1000; // mm3 -> cm3
-      if (!(volCm3 > 0) || !(ing[0] > 0) || !(ing[1] > 0) || !(ing[2] > 0)) throw new Error("Il file STEP non contiene un solido chiuso: non riesco a calcolare il volume.");
+      if (!(volCm3 > 0) || !(ing[0] > 0) || !(ing[1] > 0) || !(ing[2] > 0)) throw new Error("f.err.step_volume");
       return { ingombro: ing, volumeCm3: Math.round(volCm3 * 1000) / 1000, corpi: res.meshes.length, meshes: res.meshes };
     });
   }
@@ -91,7 +91,7 @@
       el.className = "viewer3d";
       var renderer;
       try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
-      catch (e) { throw new Error("L'anteprima 3D non è disponibile su questo dispositivo."); }
+      catch (e) { throw new Error("f.err.webgl"); }
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       el.appendChild(renderer.domElement);
 
@@ -162,7 +162,8 @@
     for (var i = 0; i < lista.length; i++) if (lista[i][0].test(testo)) return lista[i][1];
     return null;
   }
-  // Cerca nel testo del disegno i dati del cartiglio
+  // Cerca nel testo del disegno i dati del cartiglio.
+  // "trovati" e' una lista di dati strutturati ({c: campo, ...}): la pagina li scrive nella lingua scelta.
   function leggiCartiglio(righe) {
     var tutto = righe.join("\n"), campi = {}, trovati = [];
     function valore(etichetta) {
@@ -170,9 +171,9 @@
       return m ? m[1].trim() : null;
     }
     var mat = valore("materiale|material|mat\\.");
-    if (mat) { var idm = primaCorrispondenza(MATERIALI, mat); if (idm) { campi.materiale = idm; trovati.push("Materiale: " + mat); } }
+    if (mat) { var idm = primaCorrispondenza(MATERIALI, mat); if (idm) { campi.materiale = idm; trovati.push({ c: "materiale", id: idm }); } }
     var q = valore("quantit[àa]|q\\.?t[àa]|qty|pezzi|n\\.? pezzi");
-    if (q) { var n = parseInt((q.match(/\d+/) || [])[0], 10); if (n > 0) { campi.quantita = n; trovati.push("Quantità: " + n + " pz"); } }
+    if (q) { var n = parseInt((q.match(/\d+/) || [])[0], 10); if (n > 0) { campi.quantita = n; trovati.push({ c: "quantita", n: n }); } }
     var tol = valore("tolleranz[ae](?: general[ei])?|tolerance");
     if (tol) {
       var t = null;
@@ -180,12 +181,16 @@
       else if (/0[,.]0?2\b/.test(tol) && /[±+-]/.test(tol)) t = "alta";
       else if (/0[,.]0?5\b/.test(tol) && /[±+-]/.test(tol)) t = "precisa";
       else if (/2768/.test(tol)) t = "standard";
-      if (t) { campi.tolleranza = t; trovati.push("Tolleranza: " + tol); }
+      if (t) { campi.tolleranza = t; trovati.push({ c: "tolleranza", raw: tol }); }
     }
     var tr = valore("trattamento|finitura|treatment|finish");
-    if (tr) { var f = primaCorrispondenza(FINITURE, tr); if (f) { campi.finitura = f; trovati.push("Trattamento: " + tr); } else if (/nessun|none|-/i.test(tr)) { campi.finitura = "nessuna"; trovati.push("Trattamento: nessuno"); } }
+    if (tr) {
+      var f = primaCorrispondenza(FINITURE, tr);
+      if (f) { campi.finitura = f; trovati.push({ c: "trattamento", id: f }); }
+      else if (/nessun|none|-/i.test(tr)) { campi.finitura = "nessuna"; trovati.push({ c: "trattamento", id: null }); }
+    }
     // Se il cartiglio non ha l'etichetta, si cerca il materiale in tutto il testo
-    if (!campi.materiale) { var idm2 = primaCorrispondenza(MATERIALI, tutto); if (idm2) { campi.materiale = idm2; trovati.push("Materiale (dal testo del disegno)"); } }
+    if (!campi.materiale) { var idm2 = primaCorrispondenza(MATERIALI, tutto); if (idm2) { campi.materiale = idm2; trovati.push({ c: "materiale", id: idm2 }); } }
     var titolo = valore("titolo|title|descrizione|description");
     return { campi: campi, trovati: trovati, titolo: titolo };
   }

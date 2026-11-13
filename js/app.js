@@ -1,14 +1,33 @@
-/* APP: pagina pubblica, configuratore a passi, vista azienda. Tutto nel browser, nessun server. */
+/* APP: pagina pubblica, configuratore a passi, vista azienda. Tutto nel browser, nessun server.
+   Tutti i testi passano da t("chiave") (js/i18n.js + js/testi.js): italiano, tedesco, inglese. */
 (function () {
   "use strict";
 
   var S = window.SCHEDARIO;
   var P = window.PREZZI;
+  var L = window.I18N;
   var BASE = JSON.parse(JSON.stringify(S)); // copia dei valori originali, per "Ripristina"
 
-  var EUR = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
-  var NUM = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });
-  function eur(n) { return EUR.format(n); }
+  function t(k, p, l) { return L.t(k, p, l); }
+  function eur(n, l) { return L.formati(l).eur.format(n); }
+  function num(n, l) { return L.formati(l).num.format(n); }
+  function nm(tipo, elemento, l) { return L.nome(tipo, elemento, l); }
+  function macNome(id, l) { return S.macchine[id] ? nm("mac", { id: id, nome: S.macchine[id].nome }, l) : id; }
+
+  // Traduce un messaggio del motore dei prezzi o della lettura file: { k: "chiave", p: {parametri} }
+  function msg(x, l) {
+    if (typeof x === "string") return x;
+    var p = {}, src = x.p || {};
+    Object.keys(src).forEach(function (k) { p[k] = typeof src[k] === "number" ? num(src[k], l) : src[k]; });
+    if (src.finId) p.fin = nm("fin", trova(S.finiture, src.finId), l);
+    if (src.macId) p.mac = macNome(src.macId, l);
+    return t(x.k, p, l);
+  }
+  // Errore di lettura file: se il messaggio e' un codice (f.err.*) lo traduce, altrimenti testo generico
+  function erroreFile(e) {
+    var m = e && e.message ? e.message : "";
+    return m.indexOf("f.err.") === 0 ? t(m) : t("f.err.generico");
+  }
 
   /* ---------- Utilita' ---------- */
   function el(tag, attrs) {
@@ -34,6 +53,8 @@
   }
   function svuota(e) { while (e.firstChild) e.removeChild(e.firstChild); }
   function trova(lista, id) { for (var i = 0; i < lista.length; i++) if (lista[i].id === id) return lista[i]; return null; }
+  // Voci per i gruppi di scelte, con il nome gia' tradotto
+  function voci(tipo, lista) { return lista.map(function (x) { return { id: x.id, nome: nm(tipo, x) }; }); }
 
   var memoria = {}; // se il browser blocca localStorage, si lavora in memoria
   function leggi(chiave, def) {
@@ -72,19 +93,9 @@
   }
 
   /* ---------- Dati di contesto ---------- */
-  var REPARTI = [
-    { id: "tornitura", nome: "Tornitura", desc: "Più di 14 centri di tornitura per pezzi tornati, anche con asse Y e utensili motorizzati." },
-    { id: "fresatura", nome: "Fresatura", desc: "11 centri di fresatura a 3, 4 e 5 assi per componenti prismatici e complessi." },
-    { id: "cavi", nome: "Cavi e Trasmissioni Flessibili", desc: "Funi, terminali, chiusure personalizzate, tiranti per arredo e trasmissioni flessibili." },
-    { id: "assemblaggi", nome: "Assemblaggi", desc: "Sette isole di assemblaggio con pressa e codificatori, per serie piccole e medie." }
-  ];
-  function reparto(id) { return trova(REPARTI, id); }
-
-  var STATI = [
-    { id: "ricevuta", nome: "Ricevuta" },
-    { id: "in-valutazione", nome: "In valutazione" },
-    { id: "offerta-inviata", nome: "Offerta inviata" }
-  ];
+  var REPARTI = ["tornitura", "fresatura", "cavi", "assemblaggi"];
+  function repNome(id, l) { return t("rep." + id + ".nome", null, l); }
+  var STATI = ["ricevuta", "in-valutazione", "offerta-inviata"];
 
   function nuoviDati(rep) {
     var comuni = { reparto: rep, collaudo: "nessuno", urgenza: "standard" };
@@ -107,40 +118,50 @@
   function calcola(d) { return P.calcola(perMotore(d)); }
 
   // Descrizione leggibile di una richiesta: elenco di coppie [etichetta, valore]
-  function descrivi(d) {
-    var righe = [["Reparto", reparto(d.reparto).nome]];
+  function descrivi(d, l) {
+    function T(k, p) { return t(k, p, l); }
+    var righe = [[T("d.reparto"), repNome(d.reparto, l)]];
     var mat = d.materiale ? trova(S.materiali, d.materiale) : null;
     if (d.reparto === "tornitura" || d.reparto === "fresatura") {
-      righe.push(["Macchina", S.macchine[d.macchina].nome]);
-      righe.push(["Materiale", mat.nome]);
+      righe.push([T("d.macchina"), macNome(d.macchina, l)]);
+      righe.push([T("d.materiale"), nm("mat", mat, l)]);
       var g = d.geometria;
-      righe.push(["Misure", d.reparto === "tornitura" ? "Ø " + g.diametro + " × " + g.lunghezza + " mm" : g.x + " × " + g.y + " × " + g.z + " mm"]);
-      if (g.volumeFinito) righe.push(["Volume del pezzo (file)", NUM.format(g.volumeFinito) + " cm³"]);
-      righe.push(["Complessità", trova(S.complessita, d.complessita).nome]);
-      righe.push(["Tolleranze", trova(S.tolleranze, d.tolleranza).nome]);
-      righe.push(["Finitura", trova(S.finiture, d.finitura).nome]);
+      righe.push([T("d.misure"), d.reparto === "tornitura" ? "Ø " + g.diametro + " × " + g.lunghezza + " mm" : g.x + " × " + g.y + " × " + g.z + " mm"]);
+      if (g.volumeFinito) righe.push([T("d.volume_file"), num(g.volumeFinito, l) + " cm³"]);
+      righe.push([T("d.complessita"), nm("cpx", trova(S.complessita, d.complessita), l)]);
+      righe.push([T("d.tolleranze"), nm("tol", trova(S.tolleranze, d.tolleranza), l)]);
+      righe.push([T("d.finitura"), nm("fin", trova(S.finiture, d.finitura), l)]);
     } else if (d.reparto === "cavi") {
-      righe.push(["Prodotto", trova(S.cavi.prodotti, d.prodotto).nome]);
-      righe.push(["Diametro e lunghezza", "Ø " + d.diametro + " mm × " + d.lunghezza + " mm"]);
-      righe.push(["Guaina", trova(S.cavi.guaine, d.guaina).nome]);
-      righe.push(["Terminale A", trova(S.cavi.terminali, d.terminaleA).nome]);
-      righe.push(["Terminale B", trova(S.cavi.terminali, d.terminaleB).nome]);
+      righe.push([T("d.prodotto"), nm("prod", trova(S.cavi.prodotti, d.prodotto), l)]);
+      righe.push([T("d.diam_lung"), "Ø " + d.diametro + " mm × " + d.lunghezza + " mm"]);
+      righe.push([T("d.guaina"), nm("guaina", trova(S.cavi.guaine, d.guaina), l)]);
+      righe.push([T("d.term_a"), nm("term", trova(S.cavi.terminali, d.terminaleA), l)]);
+      righe.push([T("d.term_b"), nm("term", trova(S.cavi.terminali, d.terminaleB), l)]);
     } else {
-      var ops = Object.keys(d.opN).filter(function (k) { return d.opN[k] > 0; }).map(function (k) { return trova(S.assemblaggi.operazioni, k).nome + " ×" + d.opN[k]; });
-      righe.push(["Operazioni", ops.join(", ") || "—"]);
-      righe.push(["Componenti per pezzo", String(d.componenti)]);
-      righe.push(["Costo componenti", d.costoComponentiPezzo > 0 ? eur(d.costoComponentiPezzo) + " / pz" : "Forniti dal cliente"]);
+      var ops = Object.keys(d.opN).filter(function (k) { return d.opN[k] > 0; }).map(function (k) { return nm("op", trova(S.assemblaggi.operazioni, k), l) + " ×" + d.opN[k]; });
+      righe.push([T("d.operazioni"), ops.join(", ") || "—"]);
+      righe.push([T("d.comp_pezzo"), String(d.componenti)]);
+      righe.push([T("d.costo_comp"), d.costoComponentiPezzo > 0 ? eur(d.costoComponentiPezzo, l) + " / " + T("u.pz") : T("d.forniti")]);
     }
-    righe.push(["Collaudo", trova(S.collaudi, d.collaudo).nome]);
-    righe.push(["Urgenza", trova(S.urgenze, d.urgenza).nome]);
-    righe.push(["Quantità", d.quantita + " pz"]);
+    righe.push([T("d.collaudo"), nm("col", trova(S.collaudi, d.collaudo), l)]);
+    righe.push([T("d.urgenza"), nm("urg", trova(S.urgenze, d.urgenza), l)]);
+    righe.push([T("d.quantita"), d.quantita + " " + T("u.pz")]);
     return righe;
   }
-  function titoloPezzo(d) {
-    if (d.reparto === "cavi") return trova(S.cavi.prodotti, d.prodotto).nome + " Ø" + d.diametro + " × " + d.lunghezza + " mm";
-    if (d.reparto === "assemblaggi") return "Assemblaggio (" + d.componenti + " componenti)";
-    var g = d.geometria;
-    return reparto(d.reparto).nome + " in " + trova(S.materiali, d.materiale).nome + (d.reparto === "tornitura" ? " Ø" + g.diametro + " × " + g.lunghezza : " " + g.x + "×" + g.y + "×" + g.z) + " mm";
+  function titoloPezzo(d, l) {
+    if (d.reparto === "cavi") return nm("prod", trova(S.cavi.prodotti, d.prodotto), l) + " Ø" + d.diametro + " × " + d.lunghezza + " mm";
+    if (d.reparto === "assemblaggi") return t("tp.ass", { n: d.componenti }, l);
+    var g = d.geometria, mis = d.reparto === "tornitura" ? "Ø" + g.diametro + " × " + g.lunghezza : g.x + "×" + g.y + "×" + g.z;
+    return t("tp.mecc", { rep: repNome(d.reparto, l), mat: nm("mat", trova(S.materiali, d.materiale), l), mis: mis }, l);
+  }
+  // Una voce letta dal cartiglio del PDF, scritta nella lingua scelta
+  function trovatoTesto(tv, l) {
+    if (typeof tv === "string") return tv; // vecchi dati salvati come testo
+    if (tv.c === "materiale") return t("c.materiale", null, l) + ": " + nm("mat", trova(S.materiali, tv.id), l);
+    if (tv.c === "quantita") return t("c.quantita", null, l) + ": " + tv.n + " " + t("u.pz", null, l);
+    if (tv.c === "tolleranza") return t("c.tolleranza", null, l) + ": " + tv.raw;
+    if (tv.c === "trattamento") return t("c.trattamento", null, l) + ": " + (tv.id ? nm("fin", trova(S.finiture, tv.id), l) : t("c.nessuno", null, l));
+    return "";
   }
 
   /* ---------- Stato del configuratore ---------- */
@@ -151,14 +172,16 @@
   /* ---------- Componenti del modulo ---------- */
   // Bollino "dal file" sui campi compilati dalla lettura di STEP/PDF; sparisce quando l'utente cambia il valore a mano
   function badgeFile(chiave) {
-    return chiave && cfg.file && cfg.file.compilati && cfg.file.compilati[chiave] ? el("span", { class: "badge badge-blu dal-file", text: "dal file" }) : null;
+    return chiave && cfg.file && cfg.file.compilati && cfg.file.compilati[chiave] ? el("span", { class: "badge badge-blu dal-file", text: t("b.dal_file") }) : null;
   }
   function togliDalFile(chiave) { if (cfg.file && cfg.file.compilati) delete cfg.file.compilati[chiave]; }
 
-  function gruppoScelte(etichetta, voci, valore, alScelta, aiuto, chiave) {
+  function gruppoScelte(etichetta, elenco, valore, alScelta, aiuto, chiave) {
     var box = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta" }, etichetta, badgeFile(chiave)));
-    var scelte = el("div", { class: "scelte", role: "group", "aria-label": etichetta });
-    voci.forEach(function (v) {
+    // nomi corti (es. Semplice / Media / Complessa): sul telefono si dividono in colonne uguali
+    var compatte = elenco.every(function (v) { return String(v.nome).length <= 12; });
+    var scelte = el("div", { class: "scelte" + (compatte ? " compatte" : ""), role: "group", "aria-label": etichetta });
+    elenco.forEach(function (v) {
       scelte.appendChild(el("button", {
         type: "button", class: "scelta", "aria-pressed": String(v.id === valore), disabled: !!v.disabilitata,
         title: v.disabilitata ? v.disabilitata : null,
@@ -181,8 +204,8 @@
     var span = el("span", { text: String(valore), "aria-live": "polite" });
     function vai(delta) { var n = Math.min(max, Math.max(min, valore + delta)); alCambio(n); }
     return el("div", { class: "contatore" },
-      el("button", { type: "button", "aria-label": "Diminuisci", onclick: function () { vai(-1); } }, "−"), span,
-      el("button", { type: "button", "aria-label": "Aumenta", onclick: function () { vai(1); } }, "+"));
+      el("button", { type: "button", "aria-label": t("a.diminuisci"), onclick: function () { vai(-1); } }, "−"), span,
+      el("button", { type: "button", "aria-label": t("a.aumenta"), onclick: function () { vai(1); } }, "+"));
   }
   // Cambia passo e lascia traccia nella cronologia: cosi' la freccia indietro del browser
   // e il tasto indietro del mouse tornano al passo precedente.
@@ -196,21 +219,21 @@
 
   /* ---------- Caricamento file (STEP e PDF) ed esempi ---------- */
   var ESEMPI = [
-    { id: "perno-inox", nome: "Perno a gradini", sub: "Tornitura · inox 304", rep: "tornitura", macchina: "tornio", complessita: "media" },
-    { id: "boccola-bronzo", nome: "Boccola", sub: "Tornitura · bronzo", rep: "tornitura", macchina: "tornio", complessita: "semplice" },
-    { id: "flangia-acciaio", nome: "Flangia con mozzo", sub: "Tornitura · acciaio C45", rep: "tornitura", macchina: "tornio-y", complessita: "media" },
-    { id: "staffa-alluminio", nome: "Staffa ad L", sub: "Fresatura · alluminio", rep: "fresatura", macchina: "fresa-3", complessita: "media" },
-    { id: "piastra-tasche", nome: "Piastra con tasche", sub: "Fresatura · alluminio", rep: "fresatura", macchina: "fresa-4", complessita: "complessa" }
+    { id: "perno-inox", rep: "tornitura", macchina: "tornio", complessita: "media" },
+    { id: "boccola-bronzo", rep: "tornitura", macchina: "tornio", complessita: "semplice" },
+    { id: "flangia-acciaio", rep: "tornitura", macchina: "tornio-y", complessita: "media" },
+    { id: "staffa-alluminio", rep: "fresatura", macchina: "fresa-3", complessita: "media" },
+    { id: "piastra-tasche", rep: "fresatura", macchina: "fresa-4", complessita: "complessa" }
   ];
   var PRESET = {
     cavi: [
-      { nome: "Fune inox con occhiello e forcella", sub: "Ø3 · 1,5 m · 100 pz", dati: { prodotto: "fune-inox", diametro: 3, lunghezza: 1500, guaina: "pvc", terminaleA: "occhiello", terminaleB: "forcella", quantita: 100 } },
-      { nome: "Tirante per arredo", sub: "Ø4 · 2,5 m · 40 pz", dati: { prodotto: "fune-inox-19", diametro: 4, lunghezza: 2500, guaina: "nessuna", terminaleA: "filettato", terminaleB: "filettato", quantita: 40 } },
-      { nome: "Trasmissione flessibile", sub: "Ø5 · 0,8 m · 250 pz", dati: { prodotto: "trasmissione", diametro: 5, lunghezza: 800, guaina: "nylon", terminaleA: "sfera", terminaleB: "forcella", quantita: 250 } }
+      { dati: { prodotto: "fune-inox", diametro: 3, lunghezza: 1500, guaina: "pvc", terminaleA: "occhiello", terminaleB: "forcella", quantita: 100 } },
+      { dati: { prodotto: "fune-inox-19", diametro: 4, lunghezza: 2500, guaina: "nessuna", terminaleA: "filettato", terminaleB: "filettato", quantita: 40 } },
+      { dati: { prodotto: "trasmissione", diametro: 5, lunghezza: 800, guaina: "nylon", terminaleA: "sfera", terminaleB: "forcella", quantita: 250 } }
     ],
     assemblaggi: [
-      { nome: "Gruppo pressato con codifica", sub: "4 componenti · 200 pz", dati: { componenti: 4, costoComponentiPezzo: 2.5, opN: { pressatura: 2, avvitatura: 0, codifica: 1, montaggio: 0, controllo: 1 }, quantita: 200 } },
-      { nome: "Assemblaggio con avvitatura", sub: "6 componenti · 120 pz", dati: { componenti: 6, costoComponentiPezzo: 4, opN: { pressatura: 0, avvitatura: 4, codifica: 1, montaggio: 2, controllo: 1 }, quantita: 120 } }
+      { dati: { componenti: 4, costoComponentiPezzo: 2.5, opN: { pressatura: 2, avvitatura: 0, codifica: 1, montaggio: 0, controllo: 1 }, quantita: 200 } },
+      { dati: { componenti: 6, costoComponentiPezzo: 4, opN: { pressatura: 0, avvitatura: 4, codifica: 1, montaggio: 2, controllo: 1 }, quantita: 120 } }
     ]
   };
   var MAX_FILE = 40 * 1024 * 1024;
@@ -223,13 +246,13 @@
     return new Promise(function (ok, ko) {
       var r = new FileReader();
       r.onload = function () { ok(r.result); };
-      r.onerror = function () { ko(new Error("Non riesco a leggere il file.")); };
+      r.onerror = function () { ko(new Error("f.err.lettura")); };
       r.readAsArrayBuffer(file);
     });
   }
   function scaricaBuffer(url) {
     return fetch(url).then(function (r) {
-      if (!r.ok) throw new Error("Esempio non trovato (" + r.status + ").");
+      if (!r.ok) throw new Error("f.err.esempio");
       return r.arrayBuffer();
     });
   }
@@ -243,15 +266,15 @@
     var step = lista.filter(function (f) { return /\.(step|stp)$/i.test(f.name); })[0];
     var pdf = lista.filter(function (f) { return /\.pdf$/i.test(f.name); })[0];
     if (!step && !pdf) {
-      var msg = "Formato non supportato: carica un file STEP (.step, .stp) o un PDF.";
-      if (cfg.file && (cfg.file.step || cfg.file.pdf)) cfg.file.errori = [msg];   // i file già caricati restano
-      else { scartaFile(); cfg.file = { errori: [msg], avvisi: [] }; }
+      var err = { k: "f.err.formato" };
+      if (cfg.file && (cfg.file.step || cfg.file.pdf)) cfg.file.errori = [err];   // i file già caricati restano
+      else { scartaFile(); cfg.file = { errori: [err], avvisi: [] }; }
       disegna(); return;
     }
-    var voci = [];
-    if (step) voci.push({ nome: step.name, tipo: "step", dimensione: step.size, leggi: function () { return leggiBuffer(step); } });
-    if (pdf) voci.push({ nome: pdf.name, tipo: "pdf", dimensione: pdf.size, leggi: function () { return leggiBuffer(pdf); } });
-    eseguiCaricamento(voci, null, true); // true = i file già caricati dell'altro tipo restano (STEP + PDF si sommano)
+    var elencoVoci = [];
+    if (step) elencoVoci.push({ nome: step.name, tipo: "step", dimensione: step.size, leggi: function () { return leggiBuffer(step); } });
+    if (pdf) elencoVoci.push({ nome: pdf.name, tipo: "pdf", dimensione: pdf.size, leggi: function () { return leggiBuffer(pdf); } });
+    eseguiCaricamento(elencoVoci, null, true); // true = i file già caricati dell'altro tipo restano (STEP + PDF si sommano)
   }
   function caricaEsempio(id) {
     var e = trova(ESEMPI, id);
@@ -266,22 +289,25 @@
   var CAMPI_STEP = ["misure"], CAMPI_PDF = ["materiale", "tolleranza", "quantita", "finitura"];
   function tuttiGliAvvisi(f) { return (f.avvisiStep || []).concat(f.avvisiPdf || [], f.avvisi || []); }
 
-  function eseguiCaricamento(voci, esempioId, mantieni) {
+  function eseguiCaricamento(elencoVoci, esempioId, mantieni) {
     // Con "mantieni", lo STEP già letto resta se ora si aggiunge un PDF (e viceversa)
     var prec = mantieni && cfg.file && !cfg.file.caricamento ? cfg.file : null;
-    var tieneStep = !!(prec && prec.step && !voci.some(function (v) { return v.tipo === "step"; }));
-    var tienePdf = !!(prec && prec.pdf && !voci.some(function (v) { return v.tipo === "pdf"; }));
+    var tieneStep = !!(prec && prec.step && !elencoVoci.some(function (v) { return v.tipo === "step"; }));
+    var tienePdf = !!(prec && prec.pdf && !elencoVoci.some(function (v) { return v.tipo === "pdf"; }));
     var viewerTenuto = tieneStep ? prec.viewer : null;
     if (cfg.file && cfg.file.viewer && cfg.file.viewer !== viewerTenuto) cfg.file.viewer.dispose();
     var token = ++cfg.tokenFile;
-    cfg.file = { caricamento: true, nomi: voci.map(function (v) { return v.nome; }), viewer: viewerTenuto };
+    cfg.file = { caricamento: true, nomi: elencoVoci.map(function (v) { return v.nome; }), viewer: viewerTenuto };
     disegna();
     var d = cfg.dati;
-    var compiti = voci.map(function (v) {
-      if (v.dimensione && v.dimensione > MAX_FILE) return Promise.resolve({ tipo: v.tipo, nome: v.nome, errore: "«" + v.nome + "» è troppo grande (massimo 40 MB)." });
+    var compiti = elencoVoci.map(function (v) {
+      if (v.dimensione && v.dimensione > MAX_FILE) return Promise.resolve({ tipo: v.tipo, nome: v.nome, errore: { nome: v.nome, k: "f.err.grande" } });
       return v.leggi().then(function (buf) {
         return (v.tipo === "step" ? window.FILE.leggiStep(buf) : window.FILE.leggiPdf(buf)).then(function (r) { return { tipo: v.tipo, nome: v.nome, r: r }; });
-      }).catch(function (e) { return { tipo: v.tipo, nome: v.nome, errore: "«" + v.nome + "»: " + (e && e.message ? e.message : "lettura non riuscita.") }; });
+      }).catch(function (e) {
+        var m = e && e.message && e.message.indexOf("f.err.") === 0 ? e.message : "f.err.generico";
+        return { tipo: v.tipo, nome: v.nome, errore: { nome: v.nome, k: m } };
+      });
     });
     Promise.all(compiti).then(function (ris) {
       if (token !== cfg.tokenFile) return; // nel frattempo e' stato scelto un altro file
@@ -306,7 +332,7 @@
         window.FILE.creaViewer(f.step.meshes).then(function (v) {
           if (token !== cfg.tokenFile) { v.dispose(); return; }
           f.viewer = v; disegna();
-        }).catch(function (e) { f.viewerErrore = e.message; disegna(); });
+        }).catch(function (e) { f.viewerErrore = e && e.message ? e.message : "f.err.generico"; disegna(); });
       }
     });
   }
@@ -315,26 +341,26 @@
     var m = window.FILE.proponiMisure(r.ingombro, rep);
     if (rep === "tornitura") {
       d.geometria = { diametro: m.diametro, lunghezza: m.lunghezza, volumeFinito: r.volumeCm3 };
-      if (!m.tondo) f.avvisiStep.push("Il pezzo non sembra rotondo: se è prismatico conviene la fresatura. Controlla le misure.");
+      if (!m.tondo) f.avvisiStep.push({ k: "f.avv.non_tondo" });
     } else {
       d.geometria = { x: m.x, y: m.y, z: m.z, volumeFinito: r.volumeCm3 };
     }
     f.compilati.misure = true;
-    if (r.corpi > 1) f.avvisiStep.push("Il file contiene " + r.corpi + " corpi: il volume è la somma di tutti.");
+    if (r.corpi > 1) f.avvisiStep.push({ k: "f.avv.corpi", p: { n: r.corpi } });
     f.step = { nome: x.nome, ingombro: r.ingombro, volume: r.volumeCm3, meshes: r.meshes };
   }
   function applicaPdf(f, x, d) {
     var r = x.r, c = r.campi;
     f.pdf = { nome: x.nome, trovati: r.trovati, canvas: r.canvas, haTesto: r.haTesto, titolo: r.titolo };
-    if (!r.haTesto) { f.avvisiPdf.push("Il PDF non contiene testo leggibile (forse è una scansione): mostro solo l'anteprima, compila i dati a mano."); return; }
-    if (!r.trovati.length) { f.avvisiPdf.push("Nel PDF non ho trovato un cartiglio riconoscibile (materiale, quantità, tolleranze): compila i dati a mano."); return; }
+    if (!r.haTesto) { f.avvisiPdf.push({ k: "f.avv.pdf_scansione" }); return; }
+    if (!r.trovati.length) { f.avvisiPdf.push({ k: "f.avv.pdf_no_cartiglio" }); return; }
     if (d.reparto !== "tornitura" && d.reparto !== "fresatura") return;
     if (c.materiale && trova(S.materiali, c.materiale)) { d.materiale = c.materiale; f.compilati.materiale = true; }
     if (c.tolleranza) { d.tolleranza = c.tolleranza; f.compilati.tolleranza = true; }
     if (c.quantita) { d.quantita = c.quantita; f.compilati.quantita = true; }
     if (c.finitura) {
       var fin = trova(S.finiture, c.finitura), mat = trova(S.materiali, d.materiale);
-      if (fin.gruppi && fin.gruppi.indexOf(mat.gruppo) < 0) f.avvisiPdf.push("Il disegno indica «" + fin.nome + "», che non è adatta a questo materiale: non è stata applicata.");
+      if (fin.gruppi && fin.gruppi.indexOf(mat.gruppo) < 0) f.avvisiPdf.push({ k: "f.avv.finitura_pdf", p: { finId: fin.id } });
       else { d.finitura = c.finitura; f.compilati.finitura = true; }
     }
   }
@@ -343,16 +369,14 @@
     var f = cfg.file;
     var box = el("div", { class: "file-card cfg-gruppo" });
     if (rep === "tornitura" || rep === "fresatura") {
-      box.appendChild(el("span", { class: "etichetta", text: "Carica il disegno (facoltativo)" }));
-      box.appendChild(el("p", { class: "aiuto", text: "Con un file STEP leggo le misure e il volume del pezzo e il prezzo diventa più preciso. Con un PDF leggo il cartiglio (materiale, quantità, tolleranze). I file restano nel tuo browser." }));
-      var input = el("input", { type: "file", id: "file-in", class: "file-input", accept: ".step,.stp,.pdf,application/pdf", multiple: true, "aria-label": "Scegli un file STEP o PDF" });
+      box.appendChild(el("span", { class: "etichetta", text: t("f.titolo") }));
+      box.appendChild(el("p", { class: "aiuto", text: t("f.aiuto") }));
+      var input = el("input", { type: "file", id: "file-in", class: "file-input", accept: ".step,.stp,.pdf,application/pdf", multiple: true, "aria-label": t("f.scegli") });
       input.addEventListener("change", function () { if (input.files.length) caricaFileUtente(input.files); });
       // Il testo della zona guida il passo dopo: se c'è solo lo STEP chiede il PDF, e viceversa
-      var haStep = !!(f && f.step), haPdf = !!(f && f.pdf), titoloZona, testoZona;
-      if (haStep && !haPdf) { titoloZona = "Aggiungi anche il PDF del disegno"; testoZona = "Trascinalo qui o clicca: leggo materiale, quantità e tolleranze dal cartiglio"; }
-      else if (haPdf && !haStep) { titoloZona = "Aggiungi anche il file STEP"; testoZona = "Trascinalo qui o clicca: leggo misure e volume e ti mostro il pezzo in 3D"; }
-      else if (haStep && haPdf) { titoloZona = "Vuoi cambiare un file?"; testoZona = "Trascina qui un nuovo STEP o PDF: sostituisce quello dello stesso tipo"; }
-      else { titoloZona = "Trascina qui il disegno"; testoZona = "oppure clicca per scegliere un file · STEP, STP o PDF (anche tutti e due insieme)"; }
+      var haStep = !!(f && f.step), haPdf = !!(f && f.pdf), v = 0;
+      if (haStep && !haPdf) v = 1; else if (haPdf && !haStep) v = 2; else if (haStep && haPdf) v = 3;
+      var titoloZona = t("f.zona." + v + ".t"), testoZona = t("f.zona." + v + ".s");
       var zona = el("div", { class: "dropzone", tabindex: "0", role: "button", "aria-label": titoloZona },
         el("strong", { text: titoloZona }), el("span", { text: testoZona }));
       zona.addEventListener("click", function () { input.click(); });
@@ -361,63 +385,66 @@
       zona.addEventListener("dragleave", function () { zona.classList.remove("sopra"); });
       zona.addEventListener("drop", function (ev) { ev.preventDefault(); zona.classList.remove("sopra"); if (ev.dataTransfer && ev.dataTransfer.files.length) caricaFileUtente(ev.dataTransfer.files); });
       box.appendChild(input); box.appendChild(zona);
-      box.appendChild(el("span", { class: "etichetta", style: "margin-top:1rem;display:block", text: "Oppure prova con un pezzo di esempio" }));
+      box.appendChild(el("span", { class: "etichetta", style: "margin-top:1rem;display:block", text: t("f.esempi") }));
       var chips = el("div", { class: "scelte" });
       ESEMPI.forEach(function (e) {
-        chips.appendChild(el("button", { type: "button", class: "scelta", onclick: function () { caricaEsempio(e.id); } }, e.nome, el("small", { text: e.sub })));
+        chips.appendChild(el("button", { type: "button", class: "scelta", onclick: function () { caricaEsempio(e.id); } }, t("es." + e.id + ".n"), el("small", { text: t("es." + e.id + ".s") })));
       });
       box.appendChild(chips);
       if (f) box.appendChild(esitoFile(f));
     } else {
-      box.appendChild(el("span", { class: "etichetta", text: "Configurazioni di esempio" }));
+      box.appendChild(el("span", { class: "etichetta", text: t("f.conf_esempio") }));
       var ch2 = el("div", { class: "scelte" });
-      PRESET[rep].forEach(function (p) {
+      PRESET[rep].forEach(function (p, i) {
         ch2.appendChild(el("button", { type: "button", class: "scelta", onclick: function () {
           var d = cfg.dati; Object.keys(p.dati).forEach(function (k) { d[k] = JSON.parse(JSON.stringify(p.dati[k])); }); aggiorna();
-        } }, p.nome, el("small", { text: p.sub })));
+        } }, t("pre." + rep + "." + i + ".n"), el("small", { text: t("pre." + rep + "." + i + ".s") })));
       });
       box.appendChild(ch2);
     }
     return box;
   }
+  function testoErrore(e) { return (e.nome ? "«" + e.nome + "»: " : "") + t(e.k); }
+
   function esitoFile(f) {
     var out = el("div", { class: "file-esito stack", "aria-live": "polite" });
-    if (f.caricamento) { out.appendChild(el("p", { class: "aiuto", text: "Leggo " + f.nomi.join(" e ") + "… la prima volta può servire qualche secondo." })); return out; }
-    (f.errori || []).forEach(function (e) { out.appendChild(el("div", { class: "avviso avviso-errore", role: "alert", text: e })); });
-    if ((f.errori || []).length && !f.step && !f.pdf) { out.appendChild(el("p", { class: "aiuto", text: "Puoi comunque inserire le misure a mano, qui sotto." })); }
+    if (f.caricamento) { out.appendChild(el("p", { class: "aiuto", text: t("f.leggo", { nomi: f.nomi.join(" + ") }) })); return out; }
+    (f.errori || []).forEach(function (e) { out.appendChild(el("div", { class: "avviso avviso-errore", role: "alert", text: testoErrore(e) })); });
+    if ((f.errori || []).length && !f.step && !f.pdf) { out.appendChild(el("p", { class: "aiuto", text: t("f.a_mano") })); }
     if (f.step) {
       var mat = trova(S.materiali, cfg.dati.materiale);
       var peso = mat ? f.step.volume * mat.densita / 1000 : null;
-      var dati = el("dl", { class: "riepilogo", style: "grid-template-columns:1fr" },
-        el("div", null, el("dt", { text: "File STEP" }), el("dd", { text: f.step.nome })),
-        el("div", null, el("dt", { text: "Ingombro" }), el("dd", { text: f.step.ingombro.map(function (n) { return NUM.format(n); }).join(" × ") + " mm" })),
-        el("div", null, el("dt", { text: "Volume" }), el("dd", { text: NUM.format(f.step.volume) + " cm³" })),
-        peso ? el("div", null, el("dt", { text: "Peso in " + mat.nome }), el("dd", { text: NUM.format(Math.round(peso * 1000) / 1000) + " kg" })) : null);
-      var vis = f.viewer ? f.viewer.el : el("div", { class: "viewer3d viewer-attesa", text: f.viewerErrore || "Preparo l'anteprima 3D…" });
+      var dati = el("dl", { class: "riepilogo", style: "grid-template-columns:minmax(0,1fr)" },
+        el("div", null, el("dt", { text: t("s.file") }), el("dd", { text: f.step.nome })),
+        el("div", null, el("dt", { text: t("s.ingombro") }), el("dd", { text: f.step.ingombro.map(function (n) { return num(n); }).join(" × ") + " mm" })),
+        el("div", null, el("dt", { text: t("s.volume") }), el("dd", { text: num(f.step.volume) + " cm³" })),
+        peso ? el("div", null, el("dt", { text: t("s.peso_in", { mat: nm("mat", mat) }) }), el("dd", { text: num(Math.round(peso * 1000) / 1000) + " kg" })) : null);
+      var attesa = f.viewerErrore ? (f.viewerErrore.indexOf("f.err.") === 0 ? t(f.viewerErrore) : t("f.err.generico")) : t("s.preparo3d");
+      var vis = f.viewer ? f.viewer.el : el("div", { class: "viewer3d viewer-attesa", text: attesa });
       out.appendChild(el("div", { class: "file-step" }, vis, el("div", null, dati,
-        el("p", { class: "aiuto", text: f.volumeIgnorato ? "Hai cambiato le misure: il volume del file non viene più usato." : "Misure e volume sono già inseriti qui sotto: puoi correggerli. Trascina l'anteprima per ruotare il pezzo." }))));
+        el("p", { class: "aiuto", text: f.volumeIgnorato ? t("s.misure_cambiate") : t("s.misure_inserite") }))));
     }
     if (f.pdf) {
       var pdfBox = el("div", { class: "file-pdf" }, f.pdf.canvas);
       var lato = el("div", null, el("span", { class: "etichetta", text: "PDF: " + f.pdf.nome }));
       if (f.pdf.trovati.length) {
-        lato.appendChild(el("p", { class: "aiuto", text: "Letto dal cartiglio e inserito nei campi:" }));
-        lato.appendChild(el("ul", { class: "note-prezzo" }, f.pdf.trovati.map(function (t) { return el("li", { text: t }); })));
+        lato.appendChild(el("p", { class: "aiuto", text: t("s.letto_cartiglio") }));
+        lato.appendChild(el("ul", { class: "note-prezzo" }, f.pdf.trovati.map(function (tv) { return el("li", { text: trovatoTesto(tv) }); })));
       }
       pdfBox.appendChild(lato); out.appendChild(pdfBox);
     }
-    tuttiGliAvvisi(f).forEach(function (a) { out.appendChild(el("div", { class: "avviso", role: "status", text: a })); });
-    out.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { scartaFile(); disegna(); } }, "Rimuovi i file"));
+    tuttiGliAvvisi(f).forEach(function (a) { out.appendChild(el("div", { class: "avviso", role: "status", text: msg(a) })); });
+    out.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { scartaFile(); disegna(); } }, t("f.rimuovi")));
     return out;
   }
 
   /* ---------- Passo 1: reparto ---------- */
   function passoReparto() {
-    var box = el("div", { class: "card cfg-box" }, el("h3", { text: "Che lavorazione ti serve?" }));
+    var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p1.titolo") }));
     var griglia = el("div", { class: "reparto-scelta" });
     REPARTI.forEach(function (r) {
-      griglia.appendChild(el("button", { type: "button", class: "scelta", "aria-pressed": "false", onclick: function () { scegliReparto(r.id); } },
-        r.nome, el("small", { text: r.desc })));
+      griglia.appendChild(el("button", { type: "button", class: "scelta", "aria-pressed": "false", onclick: function () { scegliReparto(r); } },
+        repNome(r), el("small", { text: t("rep." + r + ".desc") })));
     });
     box.appendChild(griglia);
     return box;
@@ -431,19 +458,19 @@
 
   /* ---------- Passo 2: dettagli del pezzo ---------- */
   function materialiCompatibili() {
-    return S.materiali.map(function (m) { return { id: m.id, nome: m.nome, sub: NUM.format(m.prezzoKg) + " €/kg" }; });
+    return S.materiali.map(function (m) { return { id: m.id, nome: nm("mat", m), sub: num(m.prezzoKg) + " €/kg" }; });
   }
   function passoDettagli() {
     var d = cfg.dati, rep = d.reparto;
-    var box = el("div", { class: "card cfg-box" }, el("h3", { text: reparto(rep).nome + ": descrivi il pezzo" }));
+    var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p2.titolo", { rep: repNome(rep) }) }));
     box.appendChild(cardFile(rep));
 
     if (rep === "tornitura" || rep === "fresatura") {
       var macchine = rep === "tornitura" ? ["tornio", "tornio-y"] : ["fresa-3", "fresa-4", "fresa-5"];
-      box.appendChild(gruppoScelte("Macchina", macchine.map(function (id) { return { id: id, nome: S.macchine[id].nome }; }), d.macchina,
+      box.appendChild(gruppoScelte(t("l.macchina"), macchine.map(function (id) { return { id: id, nome: macNome(id) }; }), d.macchina,
         function (v) { d.macchina = v; aggiorna(); },
-        rep === "tornitura" ? "Il tornio con asse Y serve se ci sono fresature o fori fuori asse." : "Più assi significa meno riprese, ma una tariffa oraria più alta."));
-      box.appendChild(gruppoScelte("Materiale", materialiCompatibili(), d.materiale, function (v) {
+        rep === "tornitura" ? t("h.tornio_y") : t("h.piu_assi")));
+      box.appendChild(gruppoScelte(t("l.materiale"), materialiCompatibili(), d.materiale, function (v) {
         d.materiale = v; togliDalFile("materiale");
         var f = trova(S.finiture, d.finitura), m = trova(S.materiali, v);
         if (f.gruppi && f.gruppi.indexOf(m.gruppo) < 0) { d.finitura = "nessuna"; togliDalFile("finitura"); }
@@ -451,103 +478,102 @@
       }, null, "materiale"));
       var misure = el("div", { class: "cfg-griglia" });
       if (rep === "tornitura") {
-        misure.appendChild(campoNumero("Diametro", d.geometria.diametro, "mm", function (v) { modificaMisura(d, "diametro", v); aggiornaPrezzo(); }));
-        misure.appendChild(campoNumero("Lunghezza", d.geometria.lunghezza, "mm", function (v) { modificaMisura(d, "lunghezza", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero(t("l.diametro"), d.geometria.diametro, "mm", function (v) { modificaMisura(d, "diametro", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero(t("l.lunghezza"), d.geometria.lunghezza, "mm", function (v) { modificaMisura(d, "lunghezza", v); aggiornaPrezzo(); }));
       } else {
-        misure.appendChild(campoNumero("Lunghezza X", d.geometria.x, "mm", function (v) { modificaMisura(d, "x", v); aggiornaPrezzo(); }));
-        misure.appendChild(campoNumero("Larghezza Y", d.geometria.y, "mm", function (v) { modificaMisura(d, "y", v); aggiornaPrezzo(); }));
-        misure.appendChild(campoNumero("Altezza Z", d.geometria.z, "mm", function (v) { modificaMisura(d, "z", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero(t("l.x"), d.geometria.x, "mm", function (v) { modificaMisura(d, "x", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero(t("l.y"), d.geometria.y, "mm", function (v) { modificaMisura(d, "y", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero(t("l.z"), d.geometria.z, "mm", function (v) { modificaMisura(d, "z", v); aggiornaPrezzo(); }));
       }
-      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta" }, "Misure del pezzo finito (ingombro)", badgeFile("misure")), misure));
-      box.appendChild(gruppoScelte("Complessità", S.complessita, d.complessita, function (v) { d.complessita = v; aggiorna(); }));
-      box.appendChild(gruppoScelte("Tolleranze", S.tolleranze, d.tolleranza, function (v) { d.tolleranza = v; togliDalFile("tolleranza"); aggiorna(); }, null, "tolleranza"));
+      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta" }, t("l.misure"), badgeFile("misure")), misure));
+      box.appendChild(gruppoScelte(t("l.complessita"), voci("cpx", S.complessita), d.complessita, function (v) { d.complessita = v; aggiorna(); }));
+      box.appendChild(gruppoScelte(t("l.tolleranze"), voci("tol", S.tolleranze), d.tolleranza, function (v) { d.tolleranza = v; togliDalFile("tolleranza"); aggiorna(); }, null, "tolleranza"));
       var mat = trova(S.materiali, d.materiale);
-      box.appendChild(gruppoScelte("Finitura o trattamento", S.finiture.map(function (f) {
+      box.appendChild(gruppoScelte(t("l.finitura"), S.finiture.map(function (f) {
         var no = f.gruppi && f.gruppi.indexOf(mat.gruppo) < 0;
-        return { id: f.id, nome: f.nome, disabilitata: no ? "Non adatta a questo materiale" : null };
+        return { id: f.id, nome: nm("fin", f), disabilitata: no ? t("h.non_adatta") : null };
       }), d.finitura, function (v) { d.finitura = v; togliDalFile("finitura"); aggiorna(); }, null, "finitura"));
     }
 
     if (rep === "cavi") {
       var C = S.cavi, prod = trova(C.prodotti, d.prodotto);
-      box.appendChild(gruppoScelte("Prodotto", C.prodotti, d.prodotto, function (v) {
+      box.appendChild(gruppoScelte(t("l.prodotto"), voci("prod", C.prodotti), d.prodotto, function (v) {
         d.prodotto = v; var p = trova(C.prodotti, v);
         if (p.diametri.indexOf(d.diametro) < 0) d.diametro = p.diametri[Math.min(1, p.diametri.length - 1)];
         aggiorna();
       }));
-      box.appendChild(gruppoScelte("Diametro", prod.diametri.map(function (x) { return { id: x, nome: x + " mm" }; }), d.diametro, function (v) { d.diametro = v; aggiorna(); }));
-      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Lunghezza", d.lunghezza, "mm", function (v) { d.lunghezza = v; aggiornaPrezzo(); })));
-      box.appendChild(gruppoScelte("Guaina", C.guaine, d.guaina, function (v) { d.guaina = v; aggiorna(); }));
-      box.appendChild(gruppoScelte("Terminale lato A", C.terminali.map(function (t) { return { id: t.id, nome: t.nome }; }), d.terminaleA, function (v) { d.terminaleA = v; aggiorna(); }));
-      box.appendChild(gruppoScelte("Terminale lato B", C.terminali.map(function (t) { return { id: t.id, nome: t.nome }; }), d.terminaleB, function (v) { d.terminaleB = v; aggiorna(); }));
+      box.appendChild(gruppoScelte(t("l.diametro"), prod.diametri.map(function (x) { return { id: x, nome: x + " mm" }; }), d.diametro, function (v) { d.diametro = v; aggiorna(); }));
+      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero(t("l.lunghezza"), d.lunghezza, "mm", function (v) { d.lunghezza = v; aggiornaPrezzo(); })));
+      box.appendChild(gruppoScelte(t("l.guaina"), voci("guaina", C.guaine), d.guaina, function (v) { d.guaina = v; aggiorna(); }));
+      box.appendChild(gruppoScelte(t("l.term_a"), voci("term", C.terminali), d.terminaleA, function (v) { d.terminaleA = v; aggiorna(); }));
+      box.appendChild(gruppoScelte(t("l.term_b"), voci("term", C.terminali), d.terminaleB, function (v) { d.terminaleB = v; aggiorna(); }));
     }
 
     if (rep === "assemblaggi") {
-      var opBox = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: "Operazioni sull'isola di assemblaggio (per pezzo)" }));
+      var opBox = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: t("l.operazioni") }));
       S.assemblaggi.operazioni.forEach(function (op) {
-        opBox.appendChild(el("div", { class: "campo", style: "grid-template-columns:1fr auto;align-items:center" },
-          el("span", { text: op.nome }), contatore(d.opN[op.id], 0, 20, function (n) { d.opN[op.id] = n; aggiorna(); })));
+        opBox.appendChild(el("div", { class: "riga-contatore" },
+          el("span", { text: nm("op", op) }), contatore(d.opN[op.id], 0, 20, function (n) { d.opN[op.id] = n; aggiorna(); })));
       });
       box.appendChild(opBox);
-      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: "Componenti per pezzo" }), contatore(d.componenti, 0, 100, function (n) { d.componenti = n; aggiorna(); })));
-      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Costo dei componenti, per pezzo (0 se li fornisce il cliente)", d.costoComponentiPezzo, "€", function (v) { d.costoComponentiPezzo = v; aggiornaPrezzo(); })));
+      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: t("l.componenti") }), contatore(d.componenti, 0, 100, function (n) { d.componenti = n; aggiorna(); })));
+      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero(t("l.costo_comp"), d.costoComponentiPezzo, "€", function (v) { d.costoComponentiPezzo = v; aggiornaPrezzo(); })));
     }
 
-    box.appendChild(gruppoScelte("Collaudo", S.collaudi, d.collaudo, function (v) { d.collaudo = v; aggiorna(); }));
-    box.appendChild(gruppoScelte("Urgenza", S.urgenze.map(function (u) { return { id: u.id, nome: u.nome, sub: u.sovrapprezzo ? "+" + Math.round(u.sovrapprezzo * 100) + "%" : "tempi normali" }; }), d.urgenza, function (v) { d.urgenza = v; aggiorna(); }));
-    box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Quantità", d.quantita, "pz", function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); togliDalFile("quantita"); aggiornaPrezzo(); }, { min: 1, step: 1, chiave: "quantita" })));
+    box.appendChild(gruppoScelte(t("l.collaudo"), voci("col", S.collaudi), d.collaudo, function (v) { d.collaudo = v; aggiorna(); }));
+    box.appendChild(gruppoScelte(t("l.urgenza"), S.urgenze.map(function (u) { return { id: u.id, nome: nm("urg", u), sub: u.sovrapprezzo ? "+" + Math.round(u.sovrapprezzo * 100) + "%" : t("u.tempi_normali") }; }), d.urgenza, function (v) { d.urgenza = v; aggiorna(); }));
+    box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero(t("l.quantita"), d.quantita, t("u.pz"), function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); togliDalFile("quantita"); aggiornaPrezzo(); }, { min: 1, step: 1, chiave: "quantita" })));
 
-    var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { vaiPasso(3); vaiA("configuratore"); } }, "Continua", el("span", { "aria-hidden": "true", text: "→" }));
+    var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { vaiPasso(3); vaiA("configuratore"); } }, t("b.continua"), el("span", { "aria-hidden": "true", text: "→" }));
     box.appendChild(el("div", { class: "cfg-azioni" },
-      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { vaiPasso(1); vaiA("configuratore"); } }, "← Cambia reparto"), avanti));
+      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { vaiPasso(1); vaiA("configuratore"); } }, t("b.cambia_reparto")), avanti));
     return box;
   }
 
   /* ---------- Pannello prezzo ---------- */
   var COLORI = { materiale: "#0069b4", lavorazione: "#263272", attrezzaggio: "#5b8fd6", finitura: "#7a8bb5", collaudo: "#9bb7e0", urgenza: "#d98b1f", margine: "#8f9ab5" };
-  var NOMI_VOCI = { materiale: "Materiale", lavorazione: "Lavorazione", attrezzaggio: "Attrezzaggio macchina", finitura: "Finitura", collaudo: "Collaudo", urgenza: "Urgenza", margine: "Margine" };
 
   function pannelloPrezzoDOM(d, opz) {
     opz = opz || {};
     var c = calcola(d);
     var box = el("div", { class: "stack" });
     if (c.errore) {
-      box.appendChild(el("p", { class: "prezzo-vuoto", text: "Completa i dati per vedere il prezzo." }));
-      box.appendChild(el("div", { class: "avviso avviso-errore", role: "status", text: c.errore }));
+      box.appendChild(el("p", { class: "prezzo-vuoto", text: t("pz.completa") }));
+      box.appendChild(el("div", { class: "avviso avviso-errore", role: "status", text: msg(c.errore) }));
       return { dom: box, calc: c };
     }
     box.appendChild(el("div", { class: "prezzo-grande", text: eur(c.da) + " – " + eur(c.a) }));
-    box.appendChild(el("p", { class: "prezzo-sotto", text: "per " + c.quantita + " pz · circa " + eur(c.perPezzo) + " al pezzo" }));
+    box.appendChild(el("p", { class: "prezzo-sotto", text: t("pz.per", { q: c.quantita, pezzo: eur(c.perPezzo) }) }));
 
     var tot = 0; Object.keys(c.voci).forEach(function (k) { tot += c.voci[k]; });
     var barra = el("div", { class: "barra", "aria-hidden": "true" });
     Object.keys(c.voci).forEach(function (k) { if (c.voci[k] > 0) barra.appendChild(el("i", { style: "width:" + (c.voci[k] / tot * 100) + "%;background:" + COLORI[k] })); });
     box.appendChild(barra);
-    var voci = el("ul", { class: "voci" });
-    Object.keys(c.voci).forEach(function (k) { if (c.voci[k] > 0) voci.appendChild(el("li", null, el("span", { text: NOMI_VOCI[k] }), el("span", { text: eur(c.voci[k]) }))); });
-    voci.appendChild(el("li", null, el("strong", { text: "Totale calcolato" }), el("strong", { text: eur(c.totale) })));
-    box.appendChild(voci);
+    var vociLista = el("ul", { class: "voci" });
+    Object.keys(c.voci).forEach(function (k) { if (c.voci[k] > 0) vociLista.appendChild(el("li", null, el("span", { text: t("pz.v." + k) }), el("span", { text: eur(c.voci[k]) }))); });
+    vociLista.appendChild(el("li", null, el("strong", { text: t("pz.totale") }), el("strong", { text: eur(c.totale) })));
+    box.appendChild(vociLista);
 
     box.appendChild(el("div", { class: "dati-rapidi" },
-      el("div", null, el("strong", { text: "~" + c.giorni + " gg" }), el("span", { text: "consegna" })),
-      el("div", null, el("strong", { text: NUM.format(c.ore) + " h" }), el("span", { text: "lavorazione" })),
-      el("div", null, el("strong", { text: c.pesoPezzoKg ? NUM.format(c.pesoPezzoKg) + " kg" : "—" }), el("span", { text: "peso pezzo" }))));
+      el("div", null, el("strong", { text: "~" + c.giorni + " " + t("u.gg") }), el("span", { text: t("pz.consegna") })),
+      el("div", null, el("strong", { text: num(c.ore) + " h" }), el("span", { text: t("pz.lavorazione") })),
+      el("div", null, el("strong", { text: c.pesoPezzoKg ? num(c.pesoPezzoKg) + " kg" : "—" }), el("span", { text: t("pz.peso") }))));
 
     if (!opz.senzaTabella) {
       var quantita = [1, 10, 25, 50, 100, 250, 500];
       if (quantita.indexOf(c.quantita) < 0) { quantita.push(c.quantita); quantita.sort(function (a, b) { return a - b; }); }
       var righe = P.tabellaQuantita(perMotore(d), quantita);
-      var tab = el("table", { class: "tab-quantita" }, el("thead", null, el("tr", null, el("th", { text: "Quantità" }), el("th", { text: "€ / pezzo" }), el("th", { text: "Totale" }))));
+      var tab = el("table", { class: "tab-quantita" }, el("thead", null, el("tr", null, el("th", { text: t("pz.q") }), el("th", { text: t("pz.eur_pezzo") }), el("th", { text: t("pz.tot") }))));
       var tb = el("tbody");
       righe.forEach(function (r) {
-        tb.appendChild(el("tr", { class: r.quantita === c.quantita ? "corrente" : null }, el("td", { text: r.quantita + " pz" }), el("td", { text: eur(r.perPezzo) }), el("td", { text: eur(r.totale) })));
+        tb.appendChild(el("tr", { class: r.quantita === c.quantita ? "corrente" : null }, el("td", { text: r.quantita + " " + t("u.pz") }), el("td", { text: eur(r.perPezzo) }), el("td", { text: eur(r.totale) })));
       });
       tab.appendChild(tb);
-      box.appendChild(el("span", { class: "etichetta", text: "Confronto quantità" }));
+      box.appendChild(el("span", { class: "etichetta", text: t("pz.conf") }));
       box.appendChild(tab);
     }
-    c.avvisi.forEach(function (a) { box.appendChild(el("div", { class: "avviso", role: "status", text: a })); });
-    if (c.note.length) box.appendChild(el("ul", { class: "note-prezzo" }, c.note.map(function (n) { return el("li", { text: n }); })));
+    c.avvisi.forEach(function (a) { box.appendChild(el("div", { class: "avviso", role: "status", text: msg(a) })); });
+    if (c.note.length) box.appendChild(el("ul", { class: "note-prezzo" }, c.note.map(function (n) { return el("li", { text: msg(n) }); })));
     return { dom: box, calc: c };
   }
   function disegnaPrezzo() {
@@ -565,46 +591,45 @@
     input.value = cfg.contatti[chiave];
     input.addEventListener("input", function () { cfg.contatti[chiave] = input.value; });
     return el("div", { class: "campo" }, el("label", { for: id, text: etichetta + (opz.obbl ? " *" : "") }), input,
-      cfg.errori[chiave] ? el("span", { class: "errore-campo", role: "alert", text: cfg.errori[chiave] }) : null);
+      cfg.errori[chiave] ? el("span", { class: "errore-campo", role: "alert", text: t(cfg.errori[chiave]) }) : null);
   }
   function passoInvio() {
     var d = cfg.dati;
-    var box = el("div", { class: "card cfg-box" }, el("h3", { text: "Riepilogo e invio" }));
+    var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("i.titolo") }));
     var dl = el("dl", { class: "riepilogo" });
     descrivi(d).forEach(function (r) { dl.appendChild(el("div", null, el("dt", { text: r[0] }), el("dd", { text: r[1] }))); });
     box.appendChild(dl);
     box.appendChild(el("div", { class: "az-barra", style: "margin-bottom:.8rem" },
-      el("h3", { text: "I tuoi dati", style: "margin:0" }),
+      el("h3", { text: t("i.dati"), style: "margin:0" }),
       el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () {
-        cfg.contatti = { azienda: "Azienda di prova", nome: "Mario Rossi", email: "mario.rossi@esempio.it", telefono: "0461 000000", note: "Richiesta di prova per la demo." };
+        cfg.contatti = { azienda: t("i.prova_azienda"), nome: t("i.prova_nome"), email: t("i.prova_email"), telefono: "0461 000000", note: t("i.prova_note") };
         cfg.accetta = true; cfg.errori = {}; disegna();
-      } }, "Compila con dati di prova")));
-    box.appendChild(el("div", { class: "cfg-griglia" }, campoTesto("Nome e cognome", "nome", { obbl: true, auto: "name" }), campoTesto("Azienda", "azienda", { auto: "organization" }), campoTesto("Email", "email", { obbl: true, tipo: "email", auto: "email" })));
-    box.appendChild(campoTesto("Telefono", "telefono", { tipo: "tel", auto: "tel" }));
-    box.appendChild(campoTesto("Note per l'ufficio tecnico", "note", { area: true }));
+      } }, t("i.prova"))));
+    box.appendChild(el("div", { class: "cfg-griglia" }, campoTesto(t("i.nome"), "nome", { obbl: true, auto: "name" }), campoTesto(t("i.azienda"), "azienda", { auto: "organization" }), campoTesto(t("i.email"), "email", { obbl: true, tipo: "email", auto: "email" })));
+    box.appendChild(campoTesto(t("i.tel"), "telefono", { tipo: "tel", auto: "tel" }));
+    box.appendChild(campoTesto(t("i.note"), "note", { area: true }));
     var chk = el("input", { type: "checkbox", id: "chk-privacy" }); chk.checked = cfg.accetta;
     chk.addEventListener("change", function () { cfg.accetta = chk.checked; });
-    box.appendChild(el("div", { class: "campo" }, el("label", { for: "chk-privacy", style: "display:flex;gap:.6rem;align-items:flex-start;text-transform:none;letter-spacing:0;font-weight:500;font-size:.9rem" }, chk,
-      "Acconsento al trattamento dei dati per la richiesta di offerta (demo: i dati restano nel tuo browser). *"),
-      cfg.errori.privacy ? el("span", { class: "errore-campo", role: "alert", text: cfg.errori.privacy }) : null));
+    box.appendChild(el("div", { class: "campo" }, el("label", { for: "chk-privacy", class: "etichetta-check" }, chk, t("i.privacy")),
+      cfg.errori.privacy ? el("span", { class: "errore-campo", role: "alert", text: t(cfg.errori.privacy) }) : null));
     box.appendChild(el("div", { class: "cfg-azioni" },
-      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { vaiPasso(2); vaiA("configuratore"); } }, "← Modifica il pezzo"),
-      el("button", { type: "button", class: "btn btn-primario", id: "btn-invia", onclick: invia }, "Invia la richiesta", el("span", { "aria-hidden": "true", text: "→" }))));
+      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { vaiPasso(2); vaiA("configuratore"); } }, t("i.indietro")),
+      el("button", { type: "button", class: "btn btn-primario", id: "btn-invia", onclick: invia }, t("i.invia"), el("span", { "aria-hidden": "true", text: "→" }))));
     return box;
   }
   function invia() {
     var c = cfg.contatti, err = {};
-    if (!c.nome.trim()) err.nome = "Scrivi il tuo nome.";
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email.trim())) err.email = "Scrivi un'email valida.";
-    if (!cfg.accetta) err.privacy = "Serve il consenso per inviare la richiesta.";
+    if (!c.nome.trim()) err.nome = "i.err.nome";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email.trim())) err.email = "i.err.email";
+    if (!cfg.accetta) err.privacy = "i.err.privacy";
     cfg.errori = err;
     if (Object.keys(err).length) { disegna(); var p = document.querySelector(".errore-campo"); if (p) p.scrollIntoView({ block: "center" }); return; }
     if (cfg.inviata) return; // evita un secondo invio dello stesso modulo
     var btn = document.getElementById("btn-invia"); if (btn) btn.disabled = true;
-    var richieste = leggi("richieste", []);
-    var n = richieste.reduce(function (m, r) { return Math.max(m, parseInt(r.id.slice(4), 10) || 0); }, 0) + 1;
+    var elenco = leggi("richieste", []);
+    var n = elenco.reduce(function (m, r) { return Math.max(m, parseInt(r.id.slice(4), 10) || 0); }, 0) + 1;
     var rec = {
-      id: "RIC-" + ("0000" + n).slice(-4), creata: new Date().toISOString(), stato: "ricevuta", demo: false,
+      id: "RIC-" + ("0000" + n).slice(-4), creata: new Date().toISOString(), stato: "ricevuta", demo: false, lingua: L.corrente(),
       cliente: { azienda: c.azienda.trim(), nome: c.nome.trim(), email: c.email.trim(), telefono: c.telefono.trim(), note: c.note.trim() },
       dati: JSON.parse(JSON.stringify(cfg.dati)), prezzo: calcola(cfg.dati), ritocco: 0, offerta: null,
       file: cfg.file && (cfg.file.step || cfg.file.pdf) ? {
@@ -613,19 +638,19 @@
         pdf: cfg.file.pdf ? { nome: cfg.file.pdf.nome, trovati: cfg.file.pdf.trovati } : null
       } : null
     };
-    richieste.push(rec);
-    scrivi("richieste", richieste);
+    elenco.push(rec);
+    scrivi("richieste", elenco);
     cfg.inviata = rec.id;
     vaiPasso(4); vaiA("configuratore");
   }
   function passoFatto() {
     return el("div", { class: "card cfg-box successo" },
-      el("span", { class: "badge badge-ok", text: "Richiesta inviata" }),
-      el("h3", { text: "Grazie, abbiamo ricevuto la richiesta " + cfg.inviata }),
-      el("p", { text: "L'ufficio tecnico verifica il disegno e ti risponde con l'offerta ufficiale. Per vedere come la riceve e la elabora l'azienda, apri la vista Artigiancavi." }),
+      el("span", { class: "badge badge-ok", text: t("ok.badge") }),
+      el("h3", { text: t("ok.titolo", { id: cfg.inviata }) }),
+      el("p", { text: t("ok.testo") }),
       el("div", { class: "hero-bottoni", style: "justify-content:center" },
-        el("button", { type: "button", class: "btn btn-primario", onclick: function () { location.hash = "#/azienda/" + cfg.inviata; } }, "Vai alla vista azienda →"),
-        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { scartaFile(); cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; vaiPasso(1); } }, "Nuova richiesta")));
+        el("button", { type: "button", class: "btn btn-primario", onclick: function () { location.hash = "#/azienda/" + cfg.inviata; } }, t("ok.vai")),
+        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { scartaFile(); cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; vaiPasso(1); } }, t("ok.nuova"))));
   }
 
   /* ---------- Disegno del configuratore ---------- */
@@ -633,11 +658,11 @@
     if (!radice) return;
     var attivo = document.activeElement && document.activeElement.id;
     svuota(radice); pannelloPrezzo = null;
-    var nomi = ["Reparto", "Il pezzo", "Invio"];
+    var nomi = [t("passo.reparto"), t("passo.pezzo"), t("passo.invio")];
     var barra = el("ol", { class: "cfg-passi", style: "list-style:none;padding:0;margin:0 0 1.5rem" });
     nomi.forEach(function (n, i) {
-      var num = i + 1, stato = cfg.passo === num ? "attivo" : (cfg.passo > num ? "fatto" : "");
-      barra.appendChild(el("li", { class: "cfg-passo " + stato, "aria-current": cfg.passo === num ? "step" : null }, el("b", { text: cfg.passo > num ? "✓" : String(num) }), el("span", { text: n })));
+      var numero = i + 1, stato = cfg.passo === numero ? "attivo" : (cfg.passo > numero ? "fatto" : "");
+      barra.appendChild(el("li", { class: "cfg-passo " + stato, "aria-current": cfg.passo === numero ? "step" : null }, el("b", { text: cfg.passo > numero ? "✓" : String(numero) }), el("span", { text: n })));
     });
     radice.appendChild(barra);
 
@@ -646,7 +671,7 @@
     else if (cfg.passo === 2) {
       griglia.appendChild(passoDettagli());
       var corpo = el("div");
-      var side = el("aside", { class: "card prezzo", "aria-label": "Stima del prezzo" }, el("h3", { text: "Stima indicativa" }), corpo);
+      var side = el("aside", { class: "card prezzo", "aria-label": t("pz.stima") }, el("h3", { text: t("pz.stima") }), corpo);
       pannelloPrezzo = { corpo: corpo };
       griglia.appendChild(side);
     } else if (cfg.passo === 3) griglia.appendChild(passoInvio());
@@ -660,41 +685,38 @@
      VISTA AZIENDA
      ========================================================================== */
   var az = { tab: "richieste", sel: null, viewer: null, tokenViewer: 0 };
+  var VERSIONE_ESEMPI = 3; // aumentare quando cambiano le richieste di esempio in seedRichieste
 
   function seedRichieste() {
     var esistenti = leggi("richieste", null);
-    if (esistenti !== null && leggi("richiesteVer", 0) === 2) return;
+    if (esistenti !== null && leggi("richiesteVer", 0) === VERSIONE_ESEMPI) return;
     var dellUtente = (esistenti || []).filter(function (x) { return !x.demo; }); // le richieste inviate da chi prova restano
-    function r(id, giorniFa, cliente, dati, stato, file) {
+    function r(id, giorniFa, lingua, cliente, dati, stato, file) {
       var d = new Date(Date.now() - giorniFa * 86400000).toISOString();
-      return { id: id, creata: d, stato: stato, demo: true, cliente: cliente, dati: dati, prezzo: calcola(dati), ritocco: 0, offerta: null, file: file || null };
+      return { id: id, creata: d, stato: stato, demo: true, lingua: lingua, cliente: cliente, dati: dati, prezzo: calcola(dati), ritocco: 0, offerta: null, file: file || null };
     }
     var a = nuoviDati("tornitura"); a.materiale = "inox-304"; a.geometria = { diametro: 20, lunghezza: 100, volumeFinito: 23.584 }; a.tolleranza = "precisa"; a.finitura = "passivazione"; a.collaudo = "dimensionale"; a.quantita = 50;
     var b = nuoviDati("fresatura"); b.macchina = "fresa-5"; b.materiale = "alu-6082"; b.geometria = { x: 150, y: 100, z: 20, volumeFinito: 255.7 }; b.complessita = "complessa"; b.tolleranza = "precisa"; b.finitura = "anodizzazione"; b.collaudo = "cmm"; b.urgenza = "rapida"; b.quantita = 10;
     var c = nuoviDati("cavi"); c.prodotto = "fune-inox"; c.diametro = 4; c.lunghezza = 1500; c.guaina = "pvc"; c.terminaleA = "occhiello"; c.terminaleB = "forcella"; c.quantita = 300;
     scrivi("richieste", [
-      r("RIC-0001", 3, { azienda: "Meccanica Rossi (esempio)", nome: "Luca Rossi", email: "luca@esempio.it", telefono: "", note: "Serve certificato materiale." }, c, "ricevuta"),
-      r("RIC-0002", 2, { azienda: "Officine Bianchi (esempio)", nome: "Anna Bianchi", email: "anna@esempio.it", telefono: "", note: "" }, a, "in-valutazione",
-        { esempio: "perno-inox", step: { nome: "perno-inox.step", ingombro: [20, 20, 100], volume: 23.584 }, pdf: { nome: "perno-inox.pdf", trovati: ["Materiale: Inox AISI 304", "Quantità: 50 pz", "Tolleranza: ±0,05", "Trattamento: Passivazione"] } }),
-      r("RIC-0003", 1, { azienda: "Tecno Verdi (esempio)", nome: "Marco Verdi", email: "marco@esempio.it", telefono: "", note: "Disegno allegato in STEP." }, b, "ricevuta",
-        { esempio: "piastra-tasche", step: { nome: "piastra-tasche.step", ingombro: [150, 100, 20], volume: 255.714 }, pdf: { nome: "piastra-tasche.pdf", trovati: ["Materiale: Alluminio 6082", "Quantità: 10 pz", "Tolleranza: ±0,05"] } })
+      r("RIC-0001", 3, "it", { azienda: "Meccanica Rossi (esempio)", nome: "Luca Rossi", email: "luca@esempio.it", telefono: "", note: "Serve certificato materiale." }, c, "ricevuta"),
+      r("RIC-0002", 2, "de", { azienda: "Mayr Metallbau (Beispiel)", nome: "Hans Mayr", email: "hans@beispiel.de", telefono: "", note: "Bitte Werkstoffzeugnis 3.1 beilegen." }, a, "in-valutazione",
+        { esempio: "perno-inox", step: { nome: "perno-inox.step", ingombro: [20, 20, 100], volume: 23.584 }, pdf: { nome: "perno-inox.pdf", trovati: [{ c: "materiale", id: "inox-304" }, { c: "quantita", n: 50 }, { c: "tolleranza", raw: "±0,05" }, { c: "trattamento", id: "passivazione" }] } }),
+      r("RIC-0003", 1, "en", { azienda: "Alpine Parts Ltd (example)", nome: "Emma Clarke", email: "emma@example.com", telefono: "", note: "Drawing attached as STEP." }, b, "ricevuta",
+        { esempio: "piastra-tasche", step: { nome: "piastra-tasche.step", ingombro: [150, 100, 20], volume: 255.714 }, pdf: { nome: "piastra-tasche.pdf", trovati: [{ c: "materiale", id: "alu-6082" }, { c: "quantita", n: 10 }, { c: "tolleranza", raw: "±0,05" }] } })
     ].concat(dellUtente));
-    scrivi("richiesteVer", 2);
+    scrivi("richiesteVer", VERSIONE_ESEMPI);
   }
   function richieste() { return leggi("richieste", []); }
   function salvaRichiesta(rec) {
     var l = richieste(); for (var i = 0; i < l.length; i++) if (l[i].id === rec.id) l[i] = rec; scrivi("richieste", l);
   }
-  function dataBreve(iso) { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); } catch (e) { return ""; } }
+  function dataBreve(iso) { try { return new Date(iso).toLocaleDateString(L.locale(), { day: "2-digit", month: "short" }); } catch (e) { return ""; } }
 
+  // La risposta al cliente e' scritta nella SUA lingua (quella usata quando ha inviato la richiesta)
   function rispostaAutomatica(rec, calc, offertaTot) {
-    var q = rec.dati.quantita, per = offertaTot / q;
-    return "Gentile " + rec.cliente.nome + ",\n" +
-      "abbiamo ricevuto la sua richiesta " + rec.id + " per " + q + " pz: " + titoloPezzo(rec.dati) + ".\n" +
-      "In base ai nostri costi e tempi di lavorazione, la nostra offerta è di " + eur(offertaTot) + " (" + eur(per) + " al pezzo, IVA esclusa).\n" +
-      "Consegna prevista in circa " + calc.giorni + " giorni lavorativi dalla conferma d'ordine.\n" +
-      "L'offerta è valida 30 giorni e resta soggetta alla verifica finale del disegno.\n" +
-      "Cordiali saluti,\nUfficio commerciale";
+    var l = rec.lingua || "it", q = rec.dati.quantita;
+    return t("r.testo", { nome: rec.cliente.nome, id: rec.id, q: q, pezzo: titoloPezzo(rec.dati, l), tot: eur(offertaTot, l), per: eur(offertaTot / q, l), giorni: calc.giorni }, l);
   }
 
   function disegnaAzienda() {
@@ -704,14 +726,14 @@
     seedRichieste();
     var lista = richieste();
     var wrap = el("div", { class: "contenitore az" });
-    wrap.appendChild(el("div", { class: "az-barra" }, el("div", null, el("p", { class: "sopratitolo", text: "Vista azienda" }), el("h2", { text: "Richieste ricevute" })),
+    wrap.appendChild(el("div", { class: "az-barra" }, el("div", null, el("p", { class: "sopratitolo", text: t("az.sopra") }), el("h2", { text: t("az.titolo") })),
       el("div", { class: "az-azioni", style: "margin:0" },
         bottoneAzzera("btn btn-ghost btn-sm"),
-        el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { location.hash = "#/"; } }, "← Torna al sito"))));
-    wrap.appendChild(el("div", { class: "az-banner", text: "È quello che vede l'ufficio di Artigiancavi: ogni richiesta arriva già con il prezzo calcolato dallo schedario dei costi. L'ufficio controlla, ritocca se vuole e invia l'offerta." }));
+        el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { location.hash = "#/"; } }, t("az.torna")))));
+    wrap.appendChild(el("div", { class: "az-banner", text: t("az.banner") }));
     var tabs = el("div", { class: "az-tabs", role: "tablist" });
-    [["richieste", "Richieste (" + lista.length + ")"], ["schedario", "Schedario dei costi"]].forEach(function (t) {
-      tabs.appendChild(el("button", { type: "button", role: "tab", class: "scelta", "aria-pressed": String(az.tab === t[0]), "aria-selected": String(az.tab === t[0]), onclick: function () { az.tab = t[0]; disegnaAzienda(); } }, t[1]));
+    [["richieste", t("az.tab.richieste", { n: lista.length })], ["schedario", t("az.tab.schedario")]].forEach(function (tb) {
+      tabs.appendChild(el("button", { type: "button", role: "tab", class: "scelta", "aria-pressed": String(az.tab === tb[0]), "aria-selected": String(az.tab === tb[0]), onclick: function () { az.tab = tb[0]; disegnaAzienda(); } }, tb[1]));
     });
     wrap.appendChild(tabs);
     wrap.appendChild(az.tab === "richieste" ? tabRichieste(lista) : tabSchedario());
@@ -720,16 +742,15 @@
 
   function tabRichieste(lista) {
     var ordinate = lista.slice().sort(function (a, b) { return b.creata < a.creata ? -1 : 1; });
-    if (!ordinate.length) return el("div", { class: "card az-dettaglio" }, el("p", { text: "Nessuna richiesta." }));
+    if (!ordinate.length) return el("div", { class: "card az-dettaglio" }, el("p", { text: t("az.nessuna") }));
     if (!az.sel || !trova(lista, az.sel)) az.sel = ordinate[0].id;
     var elenco = el("div", { class: "az-elenco" });
     ordinate.forEach(function (r) {
-      var stato = trova(STATI, r.stato);
       elenco.appendChild(el("button", { type: "button", class: "az-voce", "aria-current": String(r.id === az.sel), onclick: function () { az.sel = r.id; history.replaceState(null, "", "#/azienda/" + r.id); disegnaAzienda(); } },
         el("span", { class: "riga" }, el("span", { class: "id", text: r.id }), el("span", { text: dataBreve(r.creata) })),
         el("span", { class: "riga" }, el("span", { text: r.cliente.azienda || r.cliente.nome })),
-        el("span", { class: "riga" }, el("span", { text: reparto(r.dati.reparto).nome + " · " + r.dati.quantita + " pz" }), el("strong", { text: eur(r.prezzo.totale) })),
-        el("span", null, el("span", { class: "badge " + (r.stato === "offerta-inviata" ? "badge-ok" : "badge-blu"), text: stato.nome }))));
+        el("span", { class: "riga" }, el("span", { text: repNome(r.dati.reparto) + " · " + r.dati.quantita + " " + t("u.pz") }), el("strong", { text: eur(r.prezzo.totale) })),
+        el("span", { class: "riga" }, el("span", { class: "badge " + (r.stato === "offerta-inviata" ? "badge-ok" : "badge-blu"), text: t("stato." + r.stato) }), el("span", { class: "lingua-cliente", text: (r.lingua || "it").toUpperCase(), title: t("az.lingua_cliente") }))));
     });
     return el("div", { class: "az-layout" }, elenco, dettaglioRichiesta(trova(lista, az.sel)));
   }
@@ -739,97 +760,104 @@
     var box = el("div", { class: "card az-dettaglio" });
     box.appendChild(el("h3", { text: rec.id + " · " + (rec.cliente.azienda || rec.cliente.nome) }));
     box.appendChild(el("p", { class: "aiuto", text: rec.cliente.nome + " · " + rec.cliente.email + (rec.cliente.telefono ? " · " + rec.cliente.telefono : "") }));
-    if (rec.cliente.note) box.appendChild(el("p", { text: "Note del cliente: " + rec.cliente.note }));
+    if (rec.cliente.note) box.appendChild(el("p", { text: t("az.note_cliente") + ": " + rec.cliente.note }));
 
-    var sez1 = el("div", { class: "az-sezione" }, el("h4", { text: "Cosa ha chiesto" }));
+    var sez1 = el("div", { class: "az-sezione" }, el("h4", { text: t("az.chiesto") }));
     var dl = el("dl", { class: "riepilogo" });
     descrivi(rec.dati).forEach(function (r) { dl.appendChild(el("div", null, el("dt", { text: r[0] }), el("dd", { text: r[1] }))); });
     sez1.appendChild(dl); box.appendChild(sez1);
 
     if (rec.file) box.appendChild(sezioneAllegati(rec.file));
 
-    var sez2 = el("div", { class: "az-sezione" }, el("h4", { text: "Calcolo automatico dallo schedario" }));
-    if (calc.errore) sez2.appendChild(el("div", { class: "avviso avviso-errore", text: calc.errore }));
+    var sez2 = el("div", { class: "az-sezione" }, el("h4", { text: t("az.calcolo") }));
+    if (calc.errore) sez2.appendChild(el("div", { class: "avviso avviso-errore", text: msg(calc.errore) }));
     else {
       var r2 = pannelloPrezzoDOM(rec.dati, { senzaTabella: true });
       sez2.appendChild(r2.dom);
-      if (Math.abs(calc.totale - rec.prezzo.totale) > 0.01) sez2.appendChild(el("div", { class: "avviso", text: "Lo schedario è cambiato dopo l'invio: al cliente era stata mostrata una stima di " + eur(rec.prezzo.totale) + ". Qui vale il calcolo aggiornato." }));
+      if (Math.abs(calc.totale - rec.prezzo.totale) > 0.01) sez2.appendChild(el("div", { class: "avviso", text: t("az.cambiato", { prezzo: eur(rec.prezzo.totale) }) }));
     }
     box.appendChild(sez2);
     if (calc.errore) return box;
 
     var offertaTot = Math.round(calc.totale * (1 + rec.ritocco / 100) * 100) / 100;
-    var sez3 = el("div", { class: "az-sezione" }, el("h4", { text: "Risposta al cliente" }));
+    var sez3 = el("div", { class: "az-sezione" }, el("h4", { text: t("az.risposta", { lingua: t("lang." + (rec.lingua || "it")) }) }));
     sez3.appendChild(el("div", { class: "az-azioni", style: "margin:0 0 1rem" },
-      el("span", { class: "etichetta", text: "Ritocco sul prezzo" }),
+      el("span", { class: "etichetta", text: t("az.ritocco") }),
       el("div", { class: "contatore" },
-        el("button", { type: "button", "aria-label": "Riduci del 1%", onclick: function () { rec.ritocco = Math.max(-20, rec.ritocco - 1); salvaRichiesta(rec); disegnaAzienda(); } }, "−"),
+        el("button", { type: "button", "aria-label": t("a.riduci"), onclick: function () { rec.ritocco = Math.max(-20, rec.ritocco - 1); salvaRichiesta(rec); disegnaAzienda(); } }, "−"),
         el("span", { style: "min-width:4rem", text: (rec.ritocco > 0 ? "+" : "") + rec.ritocco + "%" }),
-        el("button", { type: "button", "aria-label": "Aumenta dell'1%", onclick: function () { rec.ritocco = Math.min(30, rec.ritocco + 1); salvaRichiesta(rec); disegnaAzienda(); } }, "+")),
-      el("strong", { text: "Offerta: " + eur(offertaTot) })));
+        el("button", { type: "button", "aria-label": t("a.aumenta1"), onclick: function () { rec.ritocco = Math.min(30, rec.ritocco + 1); salvaRichiesta(rec); disegnaAzienda(); } }, "+")),
+      el("strong", { text: t("az.offerta", { tot: eur(offertaTot) }) })));
     sez3.appendChild(el("div", { class: "risposta", text: rispostaAutomatica(rec, calc, offertaTot) }));
     sez3.appendChild(el("div", { class: "az-azioni" },
-      rec.stato !== "in-valutazione" && rec.stato !== "offerta-inviata" ? el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { rec.stato = "in-valutazione"; salvaRichiesta(rec); disegnaAzienda(); } }, "Segna in valutazione") : null,
+      rec.stato !== "in-valutazione" && rec.stato !== "offerta-inviata" ? el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { rec.stato = "in-valutazione"; salvaRichiesta(rec); disegnaAzienda(); } }, t("az.segna")) : null,
       rec.stato === "offerta-inviata"
-        ? el("span", { class: "badge badge-ok", text: "Offerta inviata" + (rec.offerta ? " · " + eur(rec.offerta.totale) : "") })
+        ? el("span", { class: "badge badge-ok", text: t("az.inviata") + (rec.offerta ? " · " + eur(rec.offerta.totale) : "") })
         : el("button", { type: "button", class: "btn btn-primario btn-sm", onclick: function () {
             rec.stato = "offerta-inviata"; rec.offerta = { totale: offertaTot, giorni: calc.giorni, data: new Date().toISOString() };
             salvaRichiesta(rec); disegnaAzienda();
-          } }, "Invia offerta al cliente")));
+          } }, t("az.invia"))));
     box.appendChild(sez3);
     return box;
   }
 
   function sezioneAllegati(file) {
-    var sez = el("div", { class: "az-sezione" }, el("h4", { text: "File allegati" }));
+    var sez = el("div", { class: "az-sezione" }, el("h4", { text: t("az.allegati") }));
     var lista = el("ul", { class: "note-prezzo", style: "margin:0 0 1rem" });
-    if (file.step) lista.appendChild(el("li", { text: file.step.nome + " · ingombro " + file.step.ingombro.map(function (n) { return NUM.format(n); }).join(" × ") + " mm · volume " + NUM.format(file.step.volume) + " cm³" }));
-    if (file.pdf) lista.appendChild(el("li", { text: file.pdf.nome + (file.pdf.trovati && file.pdf.trovati.length ? " · letto: " + file.pdf.trovati.join("; ") : "") }));
+    if (file.step) lista.appendChild(el("li", { text: t("az.step_riga", { nome: file.step.nome, ing: file.step.ingombro.map(function (n) { return num(n); }).join(" × "), vol: num(file.step.volume) }) }));
+    if (file.pdf) lista.appendChild(el("li", { text: file.pdf.nome + (file.pdf.trovati && file.pdf.trovati.length ? " · " + t("az.letto") + ": " + file.pdf.trovati.map(function (tv) { return trovatoTesto(tv); }).join("; ") : "") }));
     sez.appendChild(lista);
     if (file.esempio && file.step) {
-      var slot = el("div", { class: "viewer-slot", text: "Preparo l'anteprima 3D…" });
+      var slot = el("div", { class: "viewer-slot", text: t("s.preparo3d") });
       sez.appendChild(slot);
       var token = ++az.tokenViewer;
       scaricaBuffer("esempi/pezzi/" + file.esempio + ".step").then(window.FILE.leggiStep).then(function (r) { return window.FILE.creaViewer(r.meshes); }).then(function (v) {
         if (token !== az.tokenViewer) { v.dispose(); return; }
         az.viewer = v; svuota(slot); slot.classList.add("pronto"); slot.appendChild(v.el);
-      }).catch(function (e) { slot.textContent = "Anteprima non disponibile: " + (e && e.message ? e.message : "errore"); });
-      sez.appendChild(el("p", null, el("a", { href: "esempi/pezzi/" + file.esempio + ".pdf", target: "_blank", rel: "noopener", text: "Apri il disegno PDF" })));
+      }).catch(function (e) { slot.textContent = t("az.anteprima_no") + ": " + erroreFile(e); });
+      sez.appendChild(el("p", null, el("a", { href: "esempi/pezzi/" + file.esempio + ".pdf", target: "_blank", rel: "noopener", text: t("az.apri_pdf") })));
     } else if (file.step || file.pdf) {
-      sez.appendChild(el("p", { class: "aiuto", text: "In questa demo il file resta nel browser di chi l'ha caricato. In una versione reale arriverebbe all'ufficio insieme alla richiesta." }));
+      sez.appendChild(el("p", { class: "aiuto", text: t("az.file_browser") }));
     }
     return sez;
   }
 
   function tabSchedario() {
     var cont = el("div");
-    cont.appendChild(el("p", { class: "aiuto", text: "Qui l'azienda modifica i costi di base. Ogni modifica cambia subito i prezzi calcolati, sia nel configuratore sia nelle richieste. In una versione reale questo schedario viene importato dai dati aziendali." }));
-    function tabella(titolo, righe, nota) {
-      var t = el("table", { class: "schedario-tab" });
+    cont.appendChild(el("p", { class: "aiuto", text: t("sc.intro") }));
+    // Ogni riga: nome a sinistra, valore con unita' a destra. Colonne fisse, cosi' tutte le righe sono allineate.
+    function tabella(titolo, righe) {
+      var lista = el("div", { class: "sched-righe" });
       righe.forEach(function (r) {
         var input = el("input", { class: "input", type: "number", min: 0, step: "any", value: r.valore, "aria-label": r.nome });
         input.addEventListener("change", function () { var v = parseFloat(input.value.replace(",", ".")); if (isFinite(v) && v >= 0) { r.salva(v); salvaOverride(); } disegnaAzienda(); });
-        t.appendChild(el("tr", null, el("td", { text: r.nome }), el("td", null, input), el("td", { class: "aiuto", text: r.unita })));
+        lista.appendChild(el("div", { class: "sched-riga" },
+          el("span", { class: "sched-nome", text: r.nome }),
+          el("div", { class: "input-unita sched-campo" }, input, el("span", { class: "unita", text: r.unita }))));
       });
-      return el("div", { class: "card schedario-blocco" }, el("h3", { text: titolo }), nota ? el("p", { class: "aiuto", text: nota }) : null, t);
+      return el("div", { class: "card schedario-blocco" }, el("h3", { text: titolo }), lista);
     }
-    cont.appendChild(tabella("Tariffe orarie macchine", Object.keys(S.macchine).map(function (id) {
-      return { nome: S.macchine[id].nome, valore: S.macchine[id].tariffaOra, unita: "€ / ora", salva: function (v) { S.macchine[id].tariffaOra = v; } };
-    }).concat([{ nome: "Isola di assemblaggio", valore: S.assemblaggi.tariffaIsolaOra, unita: "€ / ora", salva: function (v) { S.assemblaggi.tariffaIsolaOra = v; } }])));
-    cont.appendChild(tabella("Materiali (prezzo del grezzo)", S.materiali.map(function (m) {
-      return { nome: m.nome, valore: m.prezzoKg, unita: "€ / kg", salva: function (v) { m.prezzoKg = v; } };
-    })));
-    cont.appendChild(tabella("Margine aziendale", [{ nome: "Margine sul costo", valore: Math.round(S.margine * 100), unita: "%", salva: function (v) { S.margine = v / 100; } }]));
-    cont.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { ripristinaSchedario(); disegnaAzienda(); } }, "Ripristina i valori demo"));
-    cont.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", style: "margin-left:.6rem", onclick: function () { scrivi("richieste", null); try { localStorage.removeItem("richieste"); } catch (e) { /* ok */ } az.sel = null; disegnaAzienda(); } }, "Ripristina le richieste di esempio"));
+    var tariffe = Object.keys(S.macchine).map(function (id) {
+      return { nome: macNome(id), valore: S.macchine[id].tariffaOra, unita: t("u.eur_h"), salva: function (v) { S.macchine[id].tariffaOra = v; } };
+    }).concat([{ nome: t("sc.isola"), valore: S.assemblaggi.tariffaIsolaOra, unita: t("u.eur_h"), salva: function (v) { S.assemblaggi.tariffaIsolaOra = v; } }]);
+    var materiali = S.materiali.map(function (m) {
+      return { nome: nm("mat", m), valore: m.prezzoKg, unita: t("u.eur_kg"), salva: function (v) { m.prezzoKg = v; } };
+    });
+    var margine = [{ nome: t("sc.margine_costo"), valore: Math.round(S.margine * 100), unita: "%", salva: function (v) { S.margine = v / 100; } }];
+    cont.appendChild(el("div", { class: "sched-griglia" },
+      el("div", { class: "sched-colonna" }, tabella(t("sc.tariffe"), tariffe), tabella(t("sc.margine"), margine)),
+      tabella(t("sc.materiali"), materiali)));
+    cont.appendChild(el("div", { class: "az-azioni" },
+      el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { ripristinaSchedario(); disegnaAzienda(); } }, t("sc.ripristina")),
+      el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { scrivi("richieste", null); try { localStorage.removeItem("richieste"); } catch (e) { /* ok */ } az.sel = null; disegnaAzienda(); } }, t("sc.ripristina_rich"))));
     return cont;
   }
 
   /* ==========================================================================
-     NAVIGAZIONE, TEMA, MENU
+     NAVIGAZIONE, TEMA, LINGUA, MENU
      ========================================================================== */
   // Riporta la demo come al primo accesso: richieste, schedario e configurazione in corso.
-  // Il tema chiaro/scuro scelto non viene toccato.
+  // Il tema chiaro/scuro e la lingua scelti non vengono toccati.
   function azzeraDemo() {
     ["richieste", "richiesteVer", "schedarioOverride"].forEach(function (k) {
       delete memoria[k];
@@ -846,16 +874,16 @@
   }
   // Pulsante con doppio clic: il primo chiede conferma, il secondo azzera (niente finestre del browser)
   function bottoneAzzera(classe) {
-    var b = el("button", { type: "button", class: classe }, "Azzera la demo");
+    var b = el("button", { type: "button", class: classe }, t("z.btn"));
     var timer = null;
     b.addEventListener("click", function () {
       if (!b.dataset.conferma) {
-        b.dataset.conferma = "1"; b.textContent = "Conferma: cancella tutte le prove";
-        timer = setTimeout(function () { delete b.dataset.conferma; b.textContent = "Azzera la demo"; }, 5000);
+        b.dataset.conferma = "1"; b.textContent = t("z.conferma");
+        timer = setTimeout(function () { delete b.dataset.conferma; b.textContent = t("z.btn"); }, 5000);
       } else {
         clearTimeout(timer); azzeraDemo();
-        delete b.dataset.conferma; b.textContent = "Fatto: demo azzerata";
-        setTimeout(function () { b.textContent = "Azzera la demo"; }, 2500);
+        delete b.dataset.conferma; b.textContent = t("z.fatto");
+        setTimeout(function () { b.textContent = t("z.btn"); }, 2500);
       }
     });
     return b;
@@ -865,15 +893,20 @@
     var e = document.getElementById(id);
     if (e) e.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
+  // Etichette dei pulsanti "Vista azienda" / "Torna al sito" (intestazione e menu del telefono)
+  function etichetteNav(inAzienda) {
+    var testo = inAzienda ? t("nav.torna") : t("nav.azienda");
+    document.getElementById("btn-vista-azienda").textContent = testo;
+    var vm = document.getElementById("menu-azienda");
+    vm.textContent = testo;
+    vm.setAttribute("href", inAzienda ? "#/" : "#/azienda");
+  }
   function route() {
     var h = location.hash || "#/";
     var inAzienda = h.indexOf("#/azienda") === 0;
     document.getElementById("vista-pubblica").hidden = inAzienda;
     document.getElementById("vista-azienda").hidden = !inAzienda;
-    document.getElementById("btn-vista-azienda").textContent = inAzienda ? "Torna al sito" : "Vista azienda";
-    var vm = document.getElementById("menu-azienda");   // la stessa voce dentro il menu del telefono
-    vm.textContent = inAzienda ? "Torna al sito" : "Vista azienda";
-    vm.setAttribute("href", inAzienda ? "#/" : "#/azienda");
+    etichetteNav(inAzienda);
     if (inAzienda) {
       var m = h.match(/^#\/azienda\/(RIC-\d+)/); if (m) { az.sel = m[1]; az.tab = "richieste"; }
       disegnaAzienda(); window.scrollTo(0, 0);
@@ -884,17 +917,41 @@
     document.getElementById("btn-menu").setAttribute("aria-expanded", "false");
   }
 
+  // Selettore di lingua: due copie (intestazione e menu del telefono), stessi pulsanti
+  function creaLingue() {
+    document.querySelectorAll("[data-lingue]").forEach(function (slot) {
+      svuota(slot);
+      L.LINGUE.forEach(function (l) {
+        slot.appendChild(el("button", { type: "button", class: "lingua", "data-lingua": l, "aria-pressed": String(L.corrente() === l), "aria-label": t("lang." + l), onclick: function () { cambiaLingua(l); } }, l.toUpperCase()));
+      });
+    });
+  }
+  function costruisciTile() {
+    var griglia = document.getElementById("griglia-reparti");
+    svuota(griglia);
+    REPARTI.forEach(function (r) {
+      griglia.appendChild(el("button", { type: "button", class: "reparto-tile", onclick: function () { scegliReparto(r); } },
+        el("div", null, el("h3", { text: repNome(r) }), el("p", { text: t("rep." + r + ".desc") })), el("span", { class: "vai", text: t("vai.configura") })));
+    });
+  }
+  // Aggiorna tutto cio' che dipende dalla lingua, senza perdere cio' che l'utente ha inserito
+  function aggiornaLingua() {
+    creaLingue();
+    costruisciTile();
+    var slot = document.getElementById("azzera-slot"); svuota(slot); slot.appendChild(bottoneAzzera("link-piede"));
+    disegna();
+    var inAzienda = (location.hash || "").indexOf("#/azienda") === 0;
+    etichetteNav(inAzienda);
+    if (inAzienda) disegnaAzienda();
+  }
+  function cambiaLingua(l) { L.imposta(l); aggiornaLingua(); }
+
   function avvio() {
+    L.iniziale();
     applicaOverride();
     seedRichieste(); // le richieste di esempio esistono subito, cosi' la numerazione parte da RIC-0004
     radice = document.getElementById("configuratore-app");
-    document.getElementById("azzera-slot").appendChild(bottoneAzzera("link-piede"));
-
-    var griglia = document.getElementById("griglia-reparti");
-    REPARTI.forEach(function (r) {
-      griglia.appendChild(el("button", { type: "button", class: "reparto-tile", onclick: function () { scegliReparto(r.id); } },
-        el("div", null, el("h3", { text: r.nome }), el("p", { text: r.desc })), el("span", { class: "vai", text: "Configura →" })));
-    });
+    aggiornaLinguaIniziale();
 
     document.getElementById("btn-vista-azienda").addEventListener("click", function () {
       location.hash = (location.hash.indexOf("#/azienda") === 0) ? "#/" : "#/azienda";
@@ -931,10 +988,16 @@
 
     // Collegamento diretto per prove: ?reparto=tornitura  (apre il passo 2)
     var q = new URLSearchParams(location.search), rp = q.get("reparto");
-    if (rp && reparto(rp)) { cfg.dati = nuoviDati(rp); cfg.passo = 2; }
+    if (rp && REPARTI.indexOf(rp) >= 0) { cfg.dati = nuoviDati(rp); cfg.passo = 2; }
     try { history.replaceState({ cfgPasso: cfg.passo }, "", location.href); } catch (e) { /* ok */ }
     disegna();
     route();
+  }
+  // Prima disegnata: stesso lavoro di aggiornaLingua ma senza toccare cio' che non esiste ancora
+  function aggiornaLinguaIniziale() {
+    creaLingue();
+    costruisciTile();
+    document.getElementById("azzera-slot").appendChild(bottoneAzzera("link-piede"));
   }
 
   document.addEventListener("DOMContentLoaded", avvio);

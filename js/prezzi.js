@@ -1,5 +1,6 @@
 /* MOTORE DEI PREZZI (demo). Legge lo schedario e calcola un prezzo indicativo con il dettaglio.
-   Funziona sia nel browser sia in Node (per i test). Nessun dato esce dal browser. */
+   Funziona sia nel browser sia in Node (per i test). Nessun dato esce dal browser.
+   Errori, avvisi e note sono CODICI { k: "chiave", p: {parametri} }: li traduce la pagina (js/testi.js). */
 (function (root) {
   var S = (typeof module !== "undefined" && module.exports) ? require("./schedario.js") : root.SCHEDARIO;
 
@@ -8,7 +9,8 @@
     return null;
   }
   function arrotonda(n) { return Math.round(n * 100) / 100; }
-  function virgola(n) { return String(Math.round(n * 10) / 10).replace(".", ","); } // un decimale, con la virgola
+  function uno(n) { return Math.round(n * 10) / 10; }  // un decimale
+  function msg(k, p) { return { k: k, p: p || {} }; }
 
   // Calcola il prezzo. "r" e' la richiesta (vedi test/prova-prezzi.js per esempi).
   function calcola(r) {
@@ -18,7 +20,7 @@
     if (r.reparto === "tornitura" || r.reparto === "fresatura") res = meccanica(r, q, avvisi);
     else if (r.reparto === "cavi") res = cavi(r, q, avvisi);
     else if (r.reparto === "assemblaggi") res = assemblaggi(r, q, avvisi);
-    else return { errore: "Reparto non valido" };
+    else return { errore: msg("e.reparto") };
     if (res.errore) return res;
 
     var urg = trova(S.urgenze, r.urgenza || "standard") || S.urgenze[0];
@@ -28,7 +30,7 @@
     var totale = costo + vUrg + vMargine;
 
     var giorni = Math.max(2, Math.ceil((S.consegnaBaseGiorni[r.reparto] + res.ore / S.oreProduttiveGiorno) * urg.tempi));
-    if (q > 2000) avvisi.push("Quantità elevata: per le grandi serie l'ufficio preparerà una tariffa dedicata.");
+    if (q > 2000) avvisi.push(msg("w.quantita_alta"));
 
     return {
       reparto: r.reparto,
@@ -59,9 +61,10 @@
   function meccanica(r, q, avvisi) {
     var rep = r.reparto;
     var mat = trova(S.materiali, r.materiale);
-    if (!mat) return { errore: "Materiale non valido" };
-    var mac = S.macchine[r.macchina || (rep === "tornitura" ? "tornio" : "fresa-3")];
-    if (!mac) return { errore: "Macchina non valida" };
+    if (!mat) return { errore: msg("e.materiale") };
+    var macId = r.macchina || (rep === "tornitura" ? "tornio" : "fresa-3");
+    var mac = S.macchine[macId];
+    if (!mac) return { errore: msg("e.macchina") };
     var cpx = trova(S.complessita, r.complessita || "media") || S.complessita[1];
     var tol = trova(S.tolleranze, r.tolleranza || "standard") || S.tolleranze[0];
     var fin = trova(S.finiture, r.finitura || "nessuna") || S.finiture[0];
@@ -72,17 +75,17 @@
     var nominale, grezzo; // cm3
     if (rep === "tornitura") {
       var d = Number(g.diametro), L = Number(g.lunghezza);
-      if (!(d > 0) || !(L > 0)) return { errore: "Servono diametro e lunghezza" };
+      if (!(d > 0) || !(L > 0)) return { errore: msg("e.servono_dl") };
       nominale = Math.PI / 4 * d * d * L / 1000;
       grezzo = Math.PI / 4 * Math.pow(d + 2 * sov, 2) * (L + 2 * sov) / 1000;
-      if (L / d > 10) avvisi.push("Pezzo molto snello: potrebbe servire una lunetta, l'ufficio verificherà.");
-      if (d > 300) avvisi.push("Diametro grande: da verificare la disponibilità del tornio.");
+      if (L / d > 10) avvisi.push(msg("w.snello"));
+      if (d > 300) avvisi.push(msg("w.diametro_grande"));
     } else {
       var x = Number(g.x), y = Number(g.y), z = Number(g.z);
-      if (!(x > 0) || !(y > 0) || !(z > 0)) return { errore: "Servono le tre misure del pezzo" };
+      if (!(x > 0) || !(y > 0) || !(z > 0)) return { errore: msg("e.servono_xyz") };
       nominale = x * y * z / 1000;
       grezzo = (x + 2 * sov) * (y + 2 * sov) * (z + 2 * sov) / 1000;
-      if (Math.max(x, y, z) > 800) avvisi.push("Pezzo grande: da verificare la corsa delle macchine.");
+      if (Math.max(x, y, z) > 800) avvisi.push(msg("w.pezzo_grande"));
     }
 
     var finito = Number(g.volumeFinito) > 0 ? Number(g.volumeFinito) : nominale * S.riempimentoStimato[rep];
@@ -103,7 +106,7 @@
     var finitura = 0;
     if (fin.id !== "nessuna") {
       if (fin.gruppi && fin.gruppi.indexOf(mat.gruppo) < 0) {
-        avvisi.push("La finitura «" + fin.nome + "» non è adatta a questo materiale: non è stata conteggiata.");
+        avvisi.push(msg("w.finitura_incompatibile", { finId: fin.id }));
       } else {
         finitura = Math.max(fin.minimoLotto, fin.perKg * pesoPezzo * q);
       }
@@ -111,15 +114,15 @@
     var collaudo = col.id === "nessuno" ? 0 : col.lotto + col.perPezzo * q;
 
     var note = [];
-    if (stimato) note.push("Volume del pezzo stimato dalle misure: caricando un file STEP il calcolo è più preciso.");
-    else note.push("Volume del pezzo letto dal file STEP: " + virgola(finito) + " cm³.");
-    note.push("Tempo di lavorazione stimato: " + virgola(minPezzo) + " min/pezzo su " + mac.nome + ".");
+    if (stimato) note.push(msg("n.volume_stimato"));
+    else note.push(msg("n.volume_file", { v: uno(finito) }));
+    note.push(msg("n.tempo", { min: uno(minPezzo), macId: macId }));
 
     return {
       voci: { materiale: materiale, lavorazione: lavorazione, attrezzaggio: attrezzaggio, finitura: finitura, collaudo: collaudo },
       pesoPezzoKg: Math.round(pesoPezzo * 1000) / 1000,
       ore: minPezzo * q / 60 + attOre,
-      macchina: mac.nome,
+      macchina: macId,
       note: note
     };
   }
@@ -128,15 +131,15 @@
   function cavi(r, q, avvisi) {
     var C = S.cavi;
     var prod = trova(C.prodotti, r.prodotto);
-    if (!prod) return { errore: "Prodotto non valido" };
+    if (!prod) return { errore: msg("e.prodotto") };
     var d = Number(r.diametro), Lmm = Number(r.lunghezza);
-    if (!(d > 0) || !(Lmm > 0)) return { errore: "Servono diametro e lunghezza" };
+    if (!(d > 0) || !(Lmm > 0)) return { errore: msg("e.servono_dl") };
     var guaina = trova(C.guaine, r.guaina || "nessuna") || C.guaine[0];
     var tA = trova(C.terminali, r.terminaleA || "nessuno") || C.terminali[0];
     var tB = trova(C.terminali, r.terminaleB || "nessuno") || C.terminali[0];
     var col = trova(S.collaudi, r.collaudo || "nessuno") || S.collaudi[0];
-    if (prod.diametri.indexOf(d) < 0) avvisi.push("Diametro non a catalogo per questo prodotto: l'ufficio verificherà la disponibilità.");
-    if (Lmm > 20000) avvisi.push("Lunghezza oltre i 20 m: da verificare.");
+    if (prod.diametri.indexOf(d) < 0) avvisi.push(msg("w.diametro_catalogo"));
+    if (Lmm > 20000) avvisi.push(msg("w.lunghezza_oltre"));
 
     var Lm = Lmm / 1000;
     var prezzoMetro = prod.coeffMetro * d * d + guaina.perMmMetro * d;
@@ -151,8 +154,8 @@
       voci: { materiale: materiale, lavorazione: lavorazione, attrezzaggio: attrezzaggio, finitura: 0, collaudo: collaudo },
       pesoPezzoKg: Math.round(peso * 1000) / 1000,
       ore: q * (0.4 + 0.5 * nTerm) / 60 + 0.5,
-      macchina: "Banco taglio e pressatura",
-      note: ["Fune: " + String(arrotonda(prezzoMetro)).replace(".", ",") + " €/m (diametro " + d + " mm)."]
+      macchina: "banco",
+      note: [msg("n.fune", { prezzo: arrotonda(prezzoMetro), d: d })]
     };
   }
 
@@ -167,7 +170,7 @@
     }
     var nComp = Math.max(0, Math.floor(Number(r.componenti) || 0));
     minPezzo += nComp * A.minPerComponente;
-    if (minPezzo <= 0) return { errore: "Seleziona almeno un'operazione o indica i componenti" };
+    if (minPezzo <= 0) return { errore: msg("e.assemblaggio_vuoto") };
     var col = trova(S.collaudi, r.collaudo || "nessuno") || S.collaudi[0];
 
     var costoComp = Math.max(0, Number(r.costoComponentiPezzo) || 0);
@@ -175,14 +178,14 @@
     var lavorazione = minPezzo / 60 * A.tariffaIsolaOra * q;
     var attrezzaggio = A.attrezzaggioOre * A.tariffaIsolaOra;
     var collaudo = col.id === "nessuno" ? 0 : col.lotto + col.perPezzo * q;
-    var note = ["Tempo di assemblaggio stimato: " + virgola(minPezzo) + " min/pezzo."];
-    if (costoComp === 0) note.push("Componenti non conteggiati: si assume che li fornisca il cliente.");
+    var note = [msg("n.tempo_ass", { min: uno(minPezzo) })];
+    if (costoComp === 0) note.push(msg("n.componenti_cliente"));
 
     return {
       voci: { materiale: materiale, lavorazione: lavorazione, attrezzaggio: attrezzaggio, finitura: 0, collaudo: collaudo },
       pesoPezzoKg: null,
       ore: minPezzo * q / 60 + A.attrezzaggioOre,
-      macchina: "Isola di assemblaggio con pressa",
+      macchina: "isola",
       note: note
     };
   }

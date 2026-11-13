@@ -34,10 +34,10 @@ const casi = {
 for (const [nome, r] of Object.entries(casi)) {
   const c = P.calcola(r);
   console.log("\n== " + nome);
-  if (c.errore) { console.log("   ERRORE:", c.errore); continue; }
+  if (c.errore) { console.log("   ERRORE:", JSON.stringify(c.errore)); continue; }
   console.log("   voci:", JSON.stringify(c.voci));
   console.log("   totale " + c.totale + " € (da " + c.da + " a " + c.a + ")  |  " + c.perPezzo + " €/pz  |  " + c.giorni + " gg  |  " + c.ore + " h  |  peso " + c.pesoPezzoKg + " kg");
-  if (c.avvisi.length) console.log("   avvisi:", c.avvisi.join(" / "));
+  if (c.avvisi.length) console.log("   avvisi:", JSON.stringify(c.avvisi));
 }
 
 console.log("\n== Quantità (perno inox)");

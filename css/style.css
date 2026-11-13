@@ -180,10 +180,10 @@ html[data-theme="dark"] .logo-scuro { display: block; }
 .voci li span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
 .barra { height: 6px; background: var(--bg-2); border-radius: 3px; overflow: hidden; display: flex; margin: .3rem 0 1rem; }
 .barra i { display: block; height: 100%; }
-.dati-rapidi { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin: 1rem 0; }
-.dati-rapidi div { padding: .6rem; background: var(--bg-2); border-radius: 8px; text-align: center; }
+.dati-rapidi { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: 1rem 0; }
+.dati-rapidi div { padding: .6rem .3rem; min-width: 0; background: var(--bg-2); border-radius: 8px; text-align: center; }
 .dati-rapidi strong { display: block; font-size: 1.05rem; color: var(--titolo); }
-.dati-rapidi span { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.dati-rapidi span { display: block; font-size: .66rem; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
 .tab-quantita { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: .4rem; }
 .tab-quantita th, .tab-quantita td { padding: .35rem .3rem; text-align: right; border-bottom: 1px solid var(--line); }
 .tab-quantita th:first-child, .tab-quantita td:first-child { text-align: left; }
@@ -239,17 +239,17 @@ html[data-theme="dark"] .logo-scuro { display: block; }
   .hero { min-height: min(100dvh - var(--header-h), 680px); }
   .reparti { grid-template-columns: repeat(2, 1fr); }
   .reparto-tile { min-height: 220px; }
-  .passi { grid-template-columns: 1fr; }
+  .passi { grid-template-columns: minmax(0, 1fr); }
   .numeri { grid-template-columns: repeat(2, 1fr); }
-  .cfg { grid-template-columns: 1fr; }
+  .cfg { grid-template-columns: minmax(0, 1fr); }
   .prezzo { position: static; }
   .cfg-griglia { grid-template-columns: repeat(2, 1fr); }
-  .az-layout { grid-template-columns: 1fr; }
+  .az-layout { grid-template-columns: minmax(0, 1fr); }
 }
 /* Tablet in verticale: schede impilate e scheda del prezzo sotto il modulo */
 @media (max-width: 1049.98px) and (orientation: portrait) {
   .sezione { padding: 3.5rem 0; }
-  .riepilogo { grid-template-columns: 1fr; }
+  .riepilogo { grid-template-columns: minmax(0, 1fr); }
 }
 /* Tablet in orizzontale: si sfrutta la larghezza, prezzo accanto al modulo */
 @media (min-width: 760px) and (max-width: 1049.98px) and (orientation: landscape) {
@@ -278,17 +278,17 @@ html[data-theme="dark"] .logo-scuro { display: block; }
   .hero .lead { font-size: 1rem; }
   .hero-bottoni .btn { width: 100%; }
   .hero-punti { gap: 1.2rem; margin-top: 2rem; }
-  .reparti { grid-template-columns: 1fr; }
+  .reparti { grid-template-columns: minmax(0, 1fr); }
   .reparto-tile { min-height: 0; padding: 1.4rem 1.2rem; }
   .reparto-tile h3 { font-size: 1.3rem; }
   .cfg-box { padding: 1.2rem; }
-  .cfg-griglia { grid-template-columns: 1fr; }
-  .reparto-scelta { grid-template-columns: 1fr; }
+  .cfg-griglia { grid-template-columns: minmax(0, 1fr); }
+  .reparto-scelta { grid-template-columns: minmax(0, 1fr); }
   .cfg-azioni { flex-direction: column-reverse; }
   .cfg-azioni .btn { width: 100%; }
   .cfg-passo span { display: none; }
   .cfg-passo.attivo span { display: inline; }
-  .dati-rapidi { grid-template-columns: repeat(3, 1fr); }
+  .dati-rapidi { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .prezzo-grande { font-size: 1.6rem; }
   .az-barra .btn { width: 100%; }
   .schedario-tab input { width: 90px; }
@@ -311,6 +311,56 @@ html[data-theme="dark"] .logo-scuro { display: block; }
 .viewer-slot { display: grid; place-items: center; min-height: 80px; color: var(--muted); font-size: .9rem; margin-bottom: 1rem; }
 .viewer-slot.pronto { display: block; }
 .anteprima-pdf { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
-@media (max-width: 1049.98px) and (orientation: portrait) { .file-step, .file-pdf { grid-template-columns: 1fr; } }
+@media (max-width: 1049.98px) and (orientation: portrait) { .file-step, .file-pdf { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 440px) { .viewer3d { height: 240px; } .dropzone { padding: 1.2rem .8rem; } }
 .link-piede { border: 0; background: none; padding: 0 0 0 .6rem; color: var(--blu); font-weight: 700; text-decoration: underline; cursor: pointer; font-size: inherit; }
+
+/* ==========================================================================
+   6. LINGUE E ALLINEAMENTI
+   ========================================================================== */
+/* Selettore di lingua (IT · DE · EN) */
+.lingue { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.lingua { min-width: 42px; min-height: 36px; padding: 0 .65rem; border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: .75rem; letter-spacing: .08em; }
+.lingua + .lingua { border-left: 1px solid var(--line); }
+.lingua:hover:not([aria-pressed="true"]) { color: var(--blu); }
+.lingua[aria-pressed="true"] { background: var(--blu); color: #fff; }
+.lingue-menu { display: none; }
+.lingua-cliente { font-size: .72rem; font-weight: 700; letter-spacing: .08em; padding: .1rem .5rem; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+
+/* Righe con contatore (operazioni di assemblaggio): nome a sinistra, contatore a destra, tutte allineate */
+.riga-contatore { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 1rem; padding: .45rem 0; border-bottom: 1px dashed var(--line); }
+.riga-contatore:last-child { border-bottom: 0; }
+.campo > label.etichetta-check { display: flex; gap: .6rem; align-items: flex-start; text-transform: none; letter-spacing: 0; font-weight: 500; font-size: .9rem; color: var(--ink); }
+.etichetta-check input { margin-top: .25rem; flex: none; }
+
+/* Schedario dei costi: righe a colonne fisse (nome | valore + unita'), cosi' tutto e' incolonnato */
+.sched-griglia { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; align-items: start; margin-bottom: 1.5rem; }
+.sched-colonna { display: grid; gap: 1.5rem; }
+.schedario-blocco { padding: 1.4rem; margin-bottom: 0; }
+.schedario-blocco h3 { margin-bottom: .6rem; }
+.sched-riga { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 1rem; align-items: center; padding: .55rem 0; border-bottom: 1px solid var(--line); }
+.sched-riga:last-child { border-bottom: 0; }
+.sched-nome { font-weight: 500; overflow-wrap: anywhere; }
+.sched-campo { width: 100%; }
+.sched-campo .input { text-align: right; font-variant-numeric: tabular-nums; }
+.sched-campo .unita { min-width: 84px; white-space: nowrap; }
+.az-tabs .scelta { min-width: 8rem; }
+
+@media (max-width: 1049.98px) {
+  .lingue-testa { display: none; }
+  .menu .lingue-menu { display: inline-flex; align-self: flex-start; margin: .9rem 0 .2rem; }
+  .sched-griglia { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 440px) {
+  .sched-riga { grid-template-columns: minmax(0, 1fr); gap: .35rem; }
+  .schedario-blocco { padding: 1.1rem; }
+}
+
+/* Campi con un solo numero (quantita', lunghezza, costo): non serve che siano larghi quanto il modulo */
+.cfg-gruppo > .campo > .input-unita { max-width: 280px; }
+
+/* Telefono: scelte ordinate (righe a tutta larghezza, oppure colonne uguali per i nomi corti) */
+@media (max-width: 440px) {
+  .scelte:not(.compatte) > .scelta { flex: 1 1 100%; }
+  .scelte.compatte > .scelta { flex: 1 1 calc(33.333% - .4rem); min-width: 0; text-align: center; padding-inline: .5rem; }
+}
