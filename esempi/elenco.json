@@ -1,0 +1,77 @@
+[
+  {
+    "id": "perno-inox",
+    "nome": "Perno a gradini",
+    "reparto": "Tornitura",
+    "materiale": "Inox AISI 304",
+    "quantita": 50,
+    "tolleranza": "±0,05",
+    "trattamento": "Passivazione",
+    "ingombro_mm": [
+      20.0,
+      20.0,
+      100.0
+    ],
+    "volume_cm3": 23.584
+  },
+  {
+    "id": "boccola-bronzo",
+    "nome": "Boccola",
+    "reparto": "Tornitura",
+    "materiale": "Bronzo CuSn12",
+    "quantita": 100,
+    "tolleranza": "±0,02",
+    "trattamento": "Nessuno",
+    "ingombro_mm": [
+      40.0,
+      40.0,
+      35.0
+    ],
+    "volume_cm3": 26.7
+  },
+  {
+    "id": "flangia-acciaio",
+    "nome": "Flangia con mozzo",
+    "reparto": "Tornitura",
+    "materiale": "Acciaio C45",
+    "quantita": 25,
+    "tolleranza": "ISO 2768-m",
+    "trattamento": "Zincatura",
+    "ingombro_mm": [
+      120.0,
+      120.0,
+      25.0
+    ],
+    "volume_cm3": 160.779
+  },
+  {
+    "id": "staffa-alluminio",
+    "nome": "Staffa ad L",
+    "reparto": "Fresatura",
+    "materiale": "Alluminio 6082",
+    "quantita": 40,
+    "tolleranza": "ISO 2768-m",
+    "trattamento": "Anodizzazione",
+    "ingombro_mm": [
+      100.0,
+      40.0,
+      60.0
+    ],
+    "volume_cm3": 65.43
+  },
+  {
+    "id": "piastra-tasche",
+    "nome": "Piastra con tasche",
+    "reparto": "Fresatura",
+    "materiale": "Alluminio 6082",
+    "quantita": 10,
+    "tolleranza": "±0,05",
+    "trattamento": "Nessuno",
+    "ingombro_mm": [
+      150.0,
+      100.0,
+      20.0
+    ],
+    "volume_cm3": 255.714
+  }
+]
