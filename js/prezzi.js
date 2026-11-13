@@ -8,6 +8,7 @@
     return null;
   }
   function arrotonda(n) { return Math.round(n * 100) / 100; }
+  function virgola(n) { return String(Math.round(n * 10) / 10).replace(".", ","); } // un decimale, con la virgola
 
   // Calcola il prezzo. "r" e' la richiesta (vedi test/prova-prezzi.js per esempi).
   function calcola(r) {
@@ -111,7 +112,8 @@
 
     var note = [];
     if (stimato) note.push("Volume del pezzo stimato dalle misure: caricando un file STEP il calcolo è più preciso.");
-    note.push("Tempo di lavorazione stimato: " + (Math.round(minPezzo * 10) / 10) + " min/pezzo su " + mac.nome + ".");
+    else note.push("Volume del pezzo letto dal file STEP: " + virgola(finito) + " cm³.");
+    note.push("Tempo di lavorazione stimato: " + virgola(minPezzo) + " min/pezzo su " + mac.nome + ".");
 
     return {
       voci: { materiale: materiale, lavorazione: lavorazione, attrezzaggio: attrezzaggio, finitura: finitura, collaudo: collaudo },
@@ -150,7 +152,7 @@
       pesoPezzoKg: Math.round(peso * 1000) / 1000,
       ore: q * (0.4 + 0.5 * nTerm) / 60 + 0.5,
       macchina: "Banco taglio e pressatura",
-      note: ["Fune: " + arrotonda(prezzoMetro) + " €/m (diametro " + d + " mm)."]
+      note: ["Fune: " + String(arrotonda(prezzoMetro)).replace(".", ",") + " €/m (diametro " + d + " mm)."]
     };
   }
 
@@ -173,7 +175,7 @@
     var lavorazione = minPezzo / 60 * A.tariffaIsolaOra * q;
     var attrezzaggio = A.attrezzaggioOre * A.tariffaIsolaOra;
     var collaudo = col.id === "nessuno" ? 0 : col.lotto + col.perPezzo * q;
-    var note = ["Tempo di assemblaggio stimato: " + (Math.round(minPezzo * 10) / 10) + " min/pezzo."];
+    var note = ["Tempo di assemblaggio stimato: " + virgola(minPezzo) + " min/pezzo."];
     if (costoComp === 0) note.push("Componenti non conteggiati: si assume che li fornisca il cliente.");
 
     return {

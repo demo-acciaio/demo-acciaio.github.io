@@ -290,3 +290,23 @@ html[data-theme="dark"] .logo-scuro { display: block; }
   .az-barra .btn { width: 100%; }
   .schedario-tab input { width: 90px; }
 }
+
+/* ==========================================================================
+   5. CARICAMENTO FILE E ANTEPRIMA 3D
+   ========================================================================== */
+.file-card { padding: 1.2rem; border: 1px solid var(--line); border-radius: var(--raggio); background: var(--bg-2); }
+.file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.dropzone { display: grid; gap: .3rem; justify-items: center; text-align: center; padding: 1.6rem 1rem; border: 2px dashed color-mix(in srgb, var(--blu) 55%, var(--line)); border-radius: var(--raggio); background: var(--bg); cursor: pointer; transition: background .15s, border-color .15s; }
+.dropzone:hover, .dropzone.sopra { border-color: var(--blu); background: color-mix(in srgb, var(--blu) 8%, var(--bg)); }
+.dropzone strong { color: var(--titolo); }
+.dropzone span { color: var(--muted); font-size: .88rem; }
+.file-esito { margin-top: 1rem; }
+.file-step, .file-pdf { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+.viewer3d { position: relative; width: 100%; height: 300px; border-radius: var(--raggio); background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--blu) 14%, var(--bg)), var(--bg-2)); border: 1px solid var(--line); overflow: hidden; touch-action: none; cursor: grab; }
+.viewer3d canvas { display: block; width: 100%; height: 100%; }
+.viewer-attesa { display: grid; place-items: center; color: var(--muted); font-size: .9rem; padding: 1rem; text-align: center; cursor: default; }
+.viewer-slot { display: grid; place-items: center; min-height: 80px; color: var(--muted); font-size: .9rem; margin-bottom: 1rem; }
+.viewer-slot.pronto { display: block; }
+.anteprima-pdf { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+@media (max-width: 1049.98px) and (orientation: portrait) { .file-step, .file-pdf { grid-template-columns: 1fr; } }
+@media (max-width: 440px) { .viewer3d { height: 240px; } .dropzone { padding: 1.2rem .8rem; } }

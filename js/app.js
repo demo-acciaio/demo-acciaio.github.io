@@ -144,7 +144,7 @@
   }
 
   /* ---------- Stato del configuratore ---------- */
-  var cfg = { passo: 1, dati: null, contatti: { azienda: "", nome: "", email: "", telefono: "", note: "" }, accetta: false, errori: {}, inviata: null };
+  var cfg = { passo: 1, dati: null, contatti: { azienda: "", nome: "", email: "", telefono: "", note: "" }, accetta: false, errori: {}, inviata: null, file: null, tokenFile: 0 };
   var radice = null;      // contenitore #configuratore-app
   var pannelloPrezzo = null;
 
@@ -188,6 +188,194 @@
   function aggiorna() { disegna(); }                 // ridisegna tutto (cambio di una scelta)
   function aggiornaPrezzo() { disegnaPrezzo(); }     // solo il prezzo (mentre si digita)
 
+  /* ---------- Caricamento file (STEP e PDF) ed esempi ---------- */
+  var ESEMPI = [
+    { id: "perno-inox", nome: "Perno a gradini", sub: "Tornitura · inox 304", rep: "tornitura", macchina: "tornio", complessita: "media" },
+    { id: "boccola-bronzo", nome: "Boccola", sub: "Tornitura · bronzo", rep: "tornitura", macchina: "tornio", complessita: "semplice" },
+    { id: "flangia-acciaio", nome: "Flangia con mozzo", sub: "Tornitura · acciaio C45", rep: "tornitura", macchina: "tornio-y", complessita: "media" },
+    { id: "staffa-alluminio", nome: "Staffa ad L", sub: "Fresatura · alluminio", rep: "fresatura", macchina: "fresa-3", complessita: "media" },
+    { id: "piastra-tasche", nome: "Piastra con tasche", sub: "Fresatura · alluminio", rep: "fresatura", macchina: "fresa-4", complessita: "complessa" }
+  ];
+  var PRESET = {
+    cavi: [
+      { nome: "Fune inox con occhiello e forcella", sub: "Ø3 · 1,5 m · 100 pz", dati: { prodotto: "fune-inox", diametro: 3, lunghezza: 1500, guaina: "pvc", terminaleA: "occhiello", terminaleB: "forcella", quantita: 100 } },
+      { nome: "Tirante per arredo", sub: "Ø4 · 2,5 m · 40 pz", dati: { prodotto: "fune-inox-19", diametro: 4, lunghezza: 2500, guaina: "nessuna", terminaleA: "filettato", terminaleB: "filettato", quantita: 40 } },
+      { nome: "Trasmissione flessibile", sub: "Ø5 · 0,8 m · 250 pz", dati: { prodotto: "trasmissione", diametro: 5, lunghezza: 800, guaina: "nylon", terminaleA: "sfera", terminaleB: "forcella", quantita: 250 } }
+    ],
+    assemblaggi: [
+      { nome: "Gruppo pressato con codifica", sub: "4 componenti · 200 pz", dati: { componenti: 4, costoComponentiPezzo: 2.5, opN: { pressatura: 2, avvitatura: 0, codifica: 1, montaggio: 0, controllo: 1 }, quantita: 200 } },
+      { nome: "Assemblaggio con avvitatura", sub: "6 componenti · 120 pz", dati: { componenti: 6, costoComponentiPezzo: 4, opN: { pressatura: 0, avvitatura: 4, codifica: 1, montaggio: 2, controllo: 1 }, quantita: 120 } }
+    ]
+  };
+  var MAX_FILE = 40 * 1024 * 1024;
+
+  function scartaFile() {
+    if (cfg.file && cfg.file.viewer) cfg.file.viewer.dispose();
+    cfg.file = null; cfg.tokenFile++;
+  }
+  function leggiBuffer(file) {
+    return new Promise(function (ok, ko) {
+      var r = new FileReader();
+      r.onload = function () { ok(r.result); };
+      r.onerror = function () { ko(new Error("Non riesco a leggere il file.")); };
+      r.readAsArrayBuffer(file);
+    });
+  }
+  function scaricaBuffer(url) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("Esempio non trovato (" + r.status + ").");
+      return r.arrayBuffer();
+    });
+  }
+  function modificaMisura(d, chiave, valore) {
+    d.geometria[chiave] = valore;
+    if (d.geometria.volumeFinito) { delete d.geometria.volumeFinito; if (cfg.file) cfg.file.volumeIgnorato = true; }
+  }
+
+  function caricaFileUtente(elenco) {
+    var lista = Array.prototype.slice.call(elenco);
+    var step = lista.filter(function (f) { return /\.(step|stp)$/i.test(f.name); })[0];
+    var pdf = lista.filter(function (f) { return /\.pdf$/i.test(f.name); })[0];
+    if (!step && !pdf) { scartaFile(); cfg.file = { errori: ["Formato non supportato: carica un file STEP (.step, .stp) o un PDF."], avvisi: [] }; disegna(); return; }
+    var voci = [];
+    if (step) voci.push({ nome: step.name, tipo: "step", dimensione: step.size, leggi: function () { return leggiBuffer(step); } });
+    if (pdf) voci.push({ nome: pdf.name, tipo: "pdf", dimensione: pdf.size, leggi: function () { return leggiBuffer(pdf); } });
+    eseguiCaricamento(voci, null);
+  }
+  function caricaEsempio(id) {
+    var e = trova(ESEMPI, id);
+    if (cfg.dati.reparto !== e.rep) cfg.dati = nuoviDati(e.rep);
+    cfg.dati.macchina = e.macchina; cfg.dati.complessita = e.complessita;
+    eseguiCaricamento([
+      { nome: id + ".step", tipo: "step", leggi: function () { return scaricaBuffer("esempi/step/" + id + ".step"); } },
+      { nome: id + ".pdf", tipo: "pdf", leggi: function () { return scaricaBuffer("esempi/pdf/" + id + ".pdf"); } }
+    ], id);
+  }
+
+  function eseguiCaricamento(voci, esempioId) {
+    scartaFile();
+    var token = cfg.tokenFile;
+    cfg.file = { caricamento: true, nomi: voci.map(function (v) { return v.nome; }) };
+    disegna();
+    var d = cfg.dati;
+    var compiti = voci.map(function (v) {
+      if (v.dimensione && v.dimensione > MAX_FILE) return Promise.resolve({ tipo: v.tipo, nome: v.nome, errore: "«" + v.nome + "» è troppo grande (massimo 40 MB)." });
+      return v.leggi().then(function (buf) {
+        return (v.tipo === "step" ? window.FILE.leggiStep(buf) : window.FILE.leggiPdf(buf)).then(function (r) { return { tipo: v.tipo, nome: v.nome, r: r }; });
+      }).catch(function (e) { return { tipo: v.tipo, nome: v.nome, errore: "«" + v.nome + "»: " + (e && e.message ? e.message : "lettura non riuscita.") }; });
+    });
+    Promise.all(compiti).then(function (ris) {
+      if (token !== cfg.tokenFile) return; // nel frattempo e' stato scelto un altro file
+      var f = { esempio: esempioId, errori: [], avvisi: [] };
+      ris.forEach(function (x) {
+        if (x.errore) { f.errori.push(x.errore); return; }
+        if (x.tipo === "step") applicaStep(f, x, d);
+      });
+      ris.forEach(function (x) { if (!x.errore && x.tipo === "pdf") applicaPdf(f, x, d); }); // il PDF dopo lo STEP: il materiale del disegno vince
+      cfg.file = f;
+      disegna();
+      if (f.step) {
+        window.FILE.creaViewer(f.step.meshes).then(function (v) {
+          if (token !== cfg.tokenFile) { v.dispose(); return; }
+          f.viewer = v; disegna();
+        }).catch(function (e) { f.viewerErrore = e.message; disegna(); });
+      }
+    });
+  }
+  function applicaStep(f, x, d) {
+    var r = x.r, rep = d.reparto;
+    var m = window.FILE.proponiMisure(r.ingombro, rep);
+    if (rep === "tornitura") {
+      d.geometria = { diametro: m.diametro, lunghezza: m.lunghezza, volumeFinito: r.volumeCm3 };
+      if (!m.tondo) f.avvisi.push("Il pezzo non sembra rotondo: se è prismatico conviene la fresatura. Controlla le misure.");
+    } else {
+      d.geometria = { x: m.x, y: m.y, z: m.z, volumeFinito: r.volumeCm3 };
+    }
+    if (r.corpi > 1) f.avvisi.push("Il file contiene " + r.corpi + " corpi: il volume è la somma di tutti.");
+    f.step = { nome: x.nome, ingombro: r.ingombro, volume: r.volumeCm3, meshes: r.meshes };
+  }
+  function applicaPdf(f, x, d) {
+    var r = x.r, c = r.campi;
+    f.pdf = { nome: x.nome, trovati: r.trovati, canvas: r.canvas, haTesto: r.haTesto, titolo: r.titolo };
+    if (!r.haTesto) { f.avvisi.push("Il PDF non contiene testo leggibile (forse è una scansione): mostro solo l'anteprima, compila i dati a mano."); return; }
+    if (!r.trovati.length) { f.avvisi.push("Nel PDF non ho trovato un cartiglio riconoscibile (materiale, quantità, tolleranze): compila i dati a mano."); return; }
+    if (d.reparto !== "tornitura" && d.reparto !== "fresatura") return;
+    if (c.materiale && trova(S.materiali, c.materiale)) d.materiale = c.materiale;
+    if (c.tolleranza) d.tolleranza = c.tolleranza;
+    if (c.quantita) d.quantita = c.quantita;
+    if (c.finitura) {
+      var fin = trova(S.finiture, c.finitura), mat = trova(S.materiali, d.materiale);
+      if (fin.gruppi && fin.gruppi.indexOf(mat.gruppo) < 0) f.avvisi.push("Il disegno indica «" + fin.nome + "», che non è adatta a questo materiale: non è stata applicata.");
+      else d.finitura = c.finitura;
+    }
+  }
+
+  function cardFile(rep) {
+    var f = cfg.file;
+    var box = el("div", { class: "file-card cfg-gruppo" });
+    if (rep === "tornitura" || rep === "fresatura") {
+      box.appendChild(el("span", { class: "etichetta", text: "Carica il disegno (facoltativo)" }));
+      box.appendChild(el("p", { class: "aiuto", text: "Con un file STEP leggo le misure e il volume del pezzo e il prezzo diventa più preciso. Con un PDF leggo il cartiglio (materiale, quantità, tolleranze). I file restano nel tuo browser." }));
+      var input = el("input", { type: "file", id: "file-in", class: "file-input", accept: ".step,.stp,.pdf,application/pdf", multiple: true, "aria-label": "Scegli un file STEP o PDF" });
+      input.addEventListener("change", function () { if (input.files.length) caricaFileUtente(input.files); });
+      var zona = el("div", { class: "dropzone", tabindex: "0", role: "button", "aria-label": "Carica un file STEP o PDF" },
+        el("strong", { text: "Trascina qui il disegno" }), el("span", { text: "oppure clicca per scegliere un file · STEP, STP o PDF" }));
+      zona.addEventListener("click", function () { input.click(); });
+      zona.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); input.click(); } });
+      zona.addEventListener("dragover", function (ev) { ev.preventDefault(); zona.classList.add("sopra"); });
+      zona.addEventListener("dragleave", function () { zona.classList.remove("sopra"); });
+      zona.addEventListener("drop", function (ev) { ev.preventDefault(); zona.classList.remove("sopra"); if (ev.dataTransfer && ev.dataTransfer.files.length) caricaFileUtente(ev.dataTransfer.files); });
+      box.appendChild(input); box.appendChild(zona);
+      box.appendChild(el("span", { class: "etichetta", style: "margin-top:1rem;display:block", text: "Oppure prova con un pezzo di esempio" }));
+      var chips = el("div", { class: "scelte" });
+      ESEMPI.forEach(function (e) {
+        chips.appendChild(el("button", { type: "button", class: "scelta", onclick: function () { caricaEsempio(e.id); } }, e.nome, el("small", { text: e.sub })));
+      });
+      box.appendChild(chips);
+      if (f) box.appendChild(esitoFile(f));
+    } else {
+      box.appendChild(el("span", { class: "etichetta", text: "Configurazioni di esempio" }));
+      var ch2 = el("div", { class: "scelte" });
+      PRESET[rep].forEach(function (p) {
+        ch2.appendChild(el("button", { type: "button", class: "scelta", onclick: function () {
+          var d = cfg.dati; Object.keys(p.dati).forEach(function (k) { d[k] = JSON.parse(JSON.stringify(p.dati[k])); }); aggiorna();
+        } }, p.nome, el("small", { text: p.sub })));
+      });
+      box.appendChild(ch2);
+    }
+    return box;
+  }
+  function esitoFile(f) {
+    var out = el("div", { class: "file-esito stack", "aria-live": "polite" });
+    if (f.caricamento) { out.appendChild(el("p", { class: "aiuto", text: "Leggo " + f.nomi.join(" e ") + "… la prima volta può servire qualche secondo." })); return out; }
+    (f.errori || []).forEach(function (e) { out.appendChild(el("div", { class: "avviso avviso-errore", role: "alert", text: e })); });
+    if ((f.errori || []).length && !f.step && !f.pdf) { out.appendChild(el("p", { class: "aiuto", text: "Puoi comunque inserire le misure a mano, qui sotto." })); }
+    if (f.step) {
+      var mat = trova(S.materiali, cfg.dati.materiale);
+      var peso = mat ? f.step.volume * mat.densita / 1000 : null;
+      var dati = el("dl", { class: "riepilogo", style: "grid-template-columns:1fr" },
+        el("div", null, el("dt", { text: "File STEP" }), el("dd", { text: f.step.nome })),
+        el("div", null, el("dt", { text: "Ingombro" }), el("dd", { text: f.step.ingombro.map(function (n) { return NUM.format(n); }).join(" × ") + " mm" })),
+        el("div", null, el("dt", { text: "Volume" }), el("dd", { text: NUM.format(f.step.volume) + " cm³" })),
+        peso ? el("div", null, el("dt", { text: "Peso in " + mat.nome }), el("dd", { text: NUM.format(Math.round(peso * 1000) / 1000) + " kg" })) : null);
+      var vis = f.viewer ? f.viewer.el : el("div", { class: "viewer3d viewer-attesa", text: f.viewerErrore || "Preparo l'anteprima 3D…" });
+      out.appendChild(el("div", { class: "file-step" }, vis, el("div", null, dati,
+        el("p", { class: "aiuto", text: f.volumeIgnorato ? "Hai cambiato le misure: il volume del file non viene più usato." : "Misure e volume sono già inseriti qui sotto: puoi correggerli. Trascina l'anteprima per ruotare il pezzo." }))));
+    }
+    if (f.pdf) {
+      var pdfBox = el("div", { class: "file-pdf" }, f.pdf.canvas);
+      var lato = el("div", null, el("span", { class: "etichetta", text: "PDF: " + f.pdf.nome }));
+      if (f.pdf.trovati.length) {
+        lato.appendChild(el("p", { class: "aiuto", text: "Letto dal cartiglio e inserito nei campi:" }));
+        lato.appendChild(el("ul", { class: "note-prezzo" }, f.pdf.trovati.map(function (t) { return el("li", { text: t }); })));
+      }
+      pdfBox.appendChild(lato); out.appendChild(pdfBox);
+    }
+    (f.avvisi || []).forEach(function (a) { out.appendChild(el("div", { class: "avviso", role: "status", text: a })); });
+    out.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { scartaFile(); disegna(); } }, "Rimuovi il file"));
+    return out;
+  }
+
   /* ---------- Passo 1: reparto ---------- */
   function passoReparto() {
     var box = el("div", { class: "card cfg-box" }, el("h3", { text: "Che lavorazione ti serve?" }));
@@ -200,6 +388,7 @@
     return box;
   }
   function scegliReparto(id, saltaScroll) {
+    scartaFile();
     cfg.dati = nuoviDati(id); cfg.inviata = null; cfg.errori = {};
     vaiPasso(2);
     if (!saltaScroll) vaiA("configuratore");
@@ -212,6 +401,7 @@
   function passoDettagli() {
     var d = cfg.dati, rep = d.reparto;
     var box = el("div", { class: "card cfg-box" }, el("h3", { text: reparto(rep).nome + ": descrivi il pezzo" }));
+    box.appendChild(cardFile(rep));
 
     if (rep === "tornitura" || rep === "fresatura") {
       var macchine = rep === "tornitura" ? ["tornio", "tornio-y"] : ["fresa-3", "fresa-4", "fresa-5"];
@@ -226,12 +416,12 @@
       }));
       var misure = el("div", { class: "cfg-griglia" });
       if (rep === "tornitura") {
-        misure.appendChild(campoNumero("Diametro", d.geometria.diametro, "mm", function (v) { d.geometria.diametro = v; aggiornaPrezzo(); }));
-        misure.appendChild(campoNumero("Lunghezza", d.geometria.lunghezza, "mm", function (v) { d.geometria.lunghezza = v; aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Diametro", d.geometria.diametro, "mm", function (v) { modificaMisura(d, "diametro", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Lunghezza", d.geometria.lunghezza, "mm", function (v) { modificaMisura(d, "lunghezza", v); aggiornaPrezzo(); }));
       } else {
-        misure.appendChild(campoNumero("Lunghezza X", d.geometria.x, "mm", function (v) { d.geometria.x = v; aggiornaPrezzo(); }));
-        misure.appendChild(campoNumero("Larghezza Y", d.geometria.y, "mm", function (v) { d.geometria.y = v; aggiornaPrezzo(); }));
-        misure.appendChild(campoNumero("Altezza Z", d.geometria.z, "mm", function (v) { d.geometria.z = v; aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Lunghezza X", d.geometria.x, "mm", function (v) { modificaMisura(d, "x", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Larghezza Y", d.geometria.y, "mm", function (v) { modificaMisura(d, "y", v); aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Altezza Z", d.geometria.z, "mm", function (v) { modificaMisura(d, "z", v); aggiornaPrezzo(); }));
       }
       box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: "Misure del pezzo finito (ingombro)" }), misure));
       box.appendChild(gruppoScelte("Complessità", S.complessita, d.complessita, function (v) { d.complessita = v; aggiorna(); }));
@@ -381,7 +571,12 @@
     var rec = {
       id: "RIC-" + ("0000" + n).slice(-4), creata: new Date().toISOString(), stato: "ricevuta", demo: false,
       cliente: { azienda: c.azienda.trim(), nome: c.nome.trim(), email: c.email.trim(), telefono: c.telefono.trim(), note: c.note.trim() },
-      dati: JSON.parse(JSON.stringify(cfg.dati)), prezzo: calcola(cfg.dati), ritocco: 0, offerta: null
+      dati: JSON.parse(JSON.stringify(cfg.dati)), prezzo: calcola(cfg.dati), ritocco: 0, offerta: null,
+      file: cfg.file && (cfg.file.step || cfg.file.pdf) ? {
+        esempio: cfg.file.esempio || null,
+        step: cfg.file.step ? { nome: cfg.file.step.nome, ingombro: cfg.file.step.ingombro, volume: cfg.file.step.volume } : null,
+        pdf: cfg.file.pdf ? { nome: cfg.file.pdf.nome, trovati: cfg.file.pdf.trovati } : null
+      } : null
     };
     richieste.push(rec);
     scrivi("richieste", richieste);
@@ -395,7 +590,7 @@
       el("p", { text: "L'ufficio tecnico verifica il disegno e ti risponde con l'offerta ufficiale. Per vedere come la riceve e la elabora l'azienda, apri la vista Artigiancavi." }),
       el("div", { class: "hero-bottoni", style: "justify-content:center" },
         el("button", { type: "button", class: "btn btn-primario", onclick: function () { location.hash = "#/azienda/" + cfg.inviata; } }, "Vai alla vista azienda →"),
-        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; vaiPasso(1); } }, "Nuova richiesta")));
+        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { scartaFile(); cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; vaiPasso(1); } }, "Nuova richiesta")));
   }
 
   /* ---------- Disegno del configuratore ---------- */
@@ -429,22 +624,27 @@
   /* ==========================================================================
      VISTA AZIENDA
      ========================================================================== */
-  var az = { tab: "richieste", sel: null };
+  var az = { tab: "richieste", sel: null, viewer: null, tokenViewer: 0 };
 
   function seedRichieste() {
-    if (leggi("richieste", null) !== null) return;
-    function r(id, giorniFa, cliente, dati, stato) {
+    var esistenti = leggi("richieste", null);
+    if (esistenti !== null && leggi("richiesteVer", 0) === 2) return;
+    var dellUtente = (esistenti || []).filter(function (x) { return !x.demo; }); // le richieste inviate da chi prova restano
+    function r(id, giorniFa, cliente, dati, stato, file) {
       var d = new Date(Date.now() - giorniFa * 86400000).toISOString();
-      return { id: id, creata: d, stato: stato, demo: true, cliente: cliente, dati: dati, prezzo: calcola(dati), ritocco: 0, offerta: null };
+      return { id: id, creata: d, stato: stato, demo: true, cliente: cliente, dati: dati, prezzo: calcola(dati), ritocco: 0, offerta: null, file: file || null };
     }
-    var a = nuoviDati("tornitura"); a.materiale = "inox-304"; a.geometria = { diametro: 20, lunghezza: 100 }; a.tolleranza = "precisa"; a.finitura = "passivazione"; a.collaudo = "dimensionale"; a.quantita = 50;
-    var b = nuoviDati("fresatura"); b.macchina = "fresa-5"; b.materiale = "alu-6082"; b.geometria = { x: 150, y: 100, z: 20, volumeFinito: 255.7 }; b.complessita = "complessa"; b.tolleranza = "alta"; b.finitura = "anodizzazione"; b.collaudo = "cmm"; b.urgenza = "rapida"; b.quantita = 10;
+    var a = nuoviDati("tornitura"); a.materiale = "inox-304"; a.geometria = { diametro: 20, lunghezza: 100, volumeFinito: 23.584 }; a.tolleranza = "precisa"; a.finitura = "passivazione"; a.collaudo = "dimensionale"; a.quantita = 50;
+    var b = nuoviDati("fresatura"); b.macchina = "fresa-5"; b.materiale = "alu-6082"; b.geometria = { x: 150, y: 100, z: 20, volumeFinito: 255.7 }; b.complessita = "complessa"; b.tolleranza = "precisa"; b.finitura = "anodizzazione"; b.collaudo = "cmm"; b.urgenza = "rapida"; b.quantita = 10;
     var c = nuoviDati("cavi"); c.prodotto = "fune-inox"; c.diametro = 4; c.lunghezza = 1500; c.guaina = "pvc"; c.terminaleA = "occhiello"; c.terminaleB = "forcella"; c.quantita = 300;
     scrivi("richieste", [
       r("RIC-0001", 3, { azienda: "Meccanica Rossi (esempio)", nome: "Luca Rossi", email: "luca@esempio.it", telefono: "", note: "Serve certificato materiale." }, c, "ricevuta"),
-      r("RIC-0002", 2, { azienda: "Officine Bianchi (esempio)", nome: "Anna Bianchi", email: "anna@esempio.it", telefono: "", note: "" }, a, "in-valutazione"),
-      r("RIC-0003", 1, { azienda: "Tecno Verdi (esempio)", nome: "Marco Verdi", email: "marco@esempio.it", telefono: "", note: "Disegno allegato in STEP." }, b, "ricevuta")
-    ]);
+      r("RIC-0002", 2, { azienda: "Officine Bianchi (esempio)", nome: "Anna Bianchi", email: "anna@esempio.it", telefono: "", note: "" }, a, "in-valutazione",
+        { esempio: "perno-inox", step: { nome: "perno-inox.step", ingombro: [20, 20, 100], volume: 23.584 }, pdf: { nome: "perno-inox.pdf", trovati: ["Materiale: Inox AISI 304", "Quantità: 50 pz", "Tolleranza: ±0,05", "Trattamento: Passivazione"] } }),
+      r("RIC-0003", 1, { azienda: "Tecno Verdi (esempio)", nome: "Marco Verdi", email: "marco@esempio.it", telefono: "", note: "Disegno allegato in STEP." }, b, "ricevuta",
+        { esempio: "piastra-tasche", step: { nome: "piastra-tasche.step", ingombro: [150, 100, 20], volume: 255.714 }, pdf: { nome: "piastra-tasche.pdf", trovati: ["Materiale: Alluminio 6082", "Quantità: 10 pz", "Tolleranza: ±0,05"] } })
+    ].concat(dellUtente));
+    scrivi("richiesteVer", 2);
   }
   function richieste() { return leggi("richieste", []); }
   function salvaRichiesta(rec) {
@@ -464,6 +664,8 @@
 
   function disegnaAzienda() {
     var cont = document.getElementById("vista-azienda"); svuota(cont);
+    if (az.viewer) { az.viewer.dispose(); az.viewer = null; }
+    az.tokenViewer++;
     seedRichieste();
     var lista = richieste();
     var wrap = el("div", { class: "contenitore az" });
@@ -507,6 +709,8 @@
     descrivi(rec.dati).forEach(function (r) { dl.appendChild(el("div", null, el("dt", { text: r[0] }), el("dd", { text: r[1] }))); });
     sez1.appendChild(dl); box.appendChild(sez1);
 
+    if (rec.file) box.appendChild(sezioneAllegati(rec.file));
+
     var sez2 = el("div", { class: "az-sezione" }, el("h4", { text: "Calcolo automatico dallo schedario" }));
     if (calc.errore) sez2.appendChild(el("div", { class: "avviso avviso-errore", text: calc.errore }));
     else {
@@ -537,6 +741,27 @@
           } }, "Invia offerta al cliente")));
     box.appendChild(sez3);
     return box;
+  }
+
+  function sezioneAllegati(file) {
+    var sez = el("div", { class: "az-sezione" }, el("h4", { text: "File allegati" }));
+    var lista = el("ul", { class: "note-prezzo", style: "margin:0 0 1rem" });
+    if (file.step) lista.appendChild(el("li", { text: file.step.nome + " · ingombro " + file.step.ingombro.map(function (n) { return NUM.format(n); }).join(" × ") + " mm · volume " + NUM.format(file.step.volume) + " cm³" }));
+    if (file.pdf) lista.appendChild(el("li", { text: file.pdf.nome + (file.pdf.trovati && file.pdf.trovati.length ? " · letto: " + file.pdf.trovati.join("; ") : "") }));
+    sez.appendChild(lista);
+    if (file.esempio && file.step) {
+      var slot = el("div", { class: "viewer-slot", text: "Preparo l'anteprima 3D…" });
+      sez.appendChild(slot);
+      var token = ++az.tokenViewer;
+      scaricaBuffer("esempi/step/" + file.esempio + ".step").then(window.FILE.leggiStep).then(function (r) { return window.FILE.creaViewer(r.meshes); }).then(function (v) {
+        if (token !== az.tokenViewer) { v.dispose(); return; }
+        az.viewer = v; svuota(slot); slot.classList.add("pronto"); slot.appendChild(v.el);
+      }).catch(function (e) { slot.textContent = "Anteprima non disponibile: " + (e && e.message ? e.message : "errore"); });
+      sez.appendChild(el("p", null, el("a", { href: "esempi/pdf/" + file.esempio + ".pdf", target: "_blank", rel: "noopener", text: "Apri il disegno PDF" })));
+    } else if (file.step || file.pdf) {
+      sez.appendChild(el("p", { class: "aiuto", text: "In questa demo il file resta nel browser di chi l'ha caricato. In una versione reale arriverebbe all'ufficio insieme alla richiesta." }));
+    }
+    return sez;
   }
 
   function tabSchedario() {
