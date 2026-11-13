@@ -121,9 +121,16 @@
       camera.position.set(raggio * 1.7, raggio * 1.2, raggio * 2.0);
       var controlli = new OC.OrbitControls(camera, renderer.domElement);
       controlli.enableDamping = true; controlli.autoRotate = true; controlli.autoRotateSpeed = 1.4;
-      controlli.addEventListener("start", function () { controlli.autoRotate = false; });
+      // Mentre l'utente muove o ingrandisce il pezzo la rotazione si ferma; 3 secondi dopo che smette riparte da sola.
+      var ripartenza = null;
+      controlli.addEventListener("start", function () { clearTimeout(ripartenza); controlli.autoRotate = false; });
+      controlli.addEventListener("end", function () {
+        clearTimeout(ripartenza);
+        ripartenza = setTimeout(function () { if (!v.morto) controlli.autoRotate = true; }, 3000);
+      });
+      el.__controlli = controlli; // serve solo per le prove automatiche
 
-      var v = { el: el, morto: false, dispose: function () { v.morto = true; renderer.dispose(); } };
+      var v = { el: el, morto: false, dispose: function () { v.morto = true; clearTimeout(ripartenza); renderer.dispose(); } };
       var larg = 0, alt = 0;
       function adatta() {
         var w = el.clientWidth, h = el.clientHeight;
