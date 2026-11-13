@@ -1,0 +1,616 @@
+/* APP: pagina pubblica, configuratore a passi, vista azienda. Tutto nel browser, nessun server. */
+(function () {
+  "use strict";
+
+  var S = window.SCHEDARIO;
+  var P = window.PREZZI;
+  var BASE = JSON.parse(JSON.stringify(S)); // copia dei valori originali, per "Ripristina"
+
+  var EUR = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+  var NUM = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });
+  function eur(n) { return EUR.format(n); }
+
+  /* ---------- Utilita' ---------- */
+  function el(tag, attrs) {
+    var e = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        var v = attrs[k];
+        if (v === null || v === undefined || v === false) return;
+        if (k === "class") e.className = v;
+        else if (k === "text") e.textContent = v;
+        else if (k.indexOf("on") === 0 && typeof v === "function") e.addEventListener(k.slice(2), v);
+        else if (v === true) e.setAttribute(k, "");
+        else e.setAttribute(k, v);
+      });
+    }
+    for (var i = 2; i < arguments.length; i++) append(e, arguments[i]);
+    return e;
+  }
+  function append(parent, c) {
+    if (c === null || c === undefined || c === false) return;
+    if (Array.isArray(c)) { c.forEach(function (x) { append(parent, x); }); return; }
+    parent.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(String(c)) : c);
+  }
+  function svuota(e) { while (e.firstChild) e.removeChild(e.firstChild); }
+  function trova(lista, id) { for (var i = 0; i < lista.length; i++) if (lista[i].id === id) return lista[i]; return null; }
+
+  var memoria = {}; // se il browser blocca localStorage, si lavora in memoria
+  function leggi(chiave, def) {
+    try {
+      var v = localStorage.getItem(chiave);
+      var p = v ? JSON.parse(v) : null;
+      return p === null ? def : p;
+    } catch (e) { return memoria[chiave] !== undefined && memoria[chiave] !== null ? memoria[chiave] : def; }
+  }
+  function scrivi(chiave, valore) {
+    memoria[chiave] = valore;
+    try { localStorage.setItem(chiave, JSON.stringify(valore)); } catch (e) { /* si resta in memoria */ }
+  }
+
+  /* ---------- Schedario modificabile (la vista azienda lo cambia, il prezzo si aggiorna) ---------- */
+  function applicaOverride() {
+    var o = leggi("schedarioOverride", null);
+    if (!o) return;
+    if (typeof o.margine === "number") S.margine = o.margine;
+    if (typeof o.isola === "number") S.assemblaggi.tariffaIsolaOra = o.isola;
+    Object.keys(o.macchine || {}).forEach(function (id) { if (S.macchine[id]) S.macchine[id].tariffaOra = o.macchine[id]; });
+    Object.keys(o.materiali || {}).forEach(function (id) { var m = trova(S.materiali, id); if (m) m.prezzoKg = o.materiali[id]; });
+  }
+  function salvaOverride() {
+    var o = { margine: S.margine, isola: S.assemblaggi.tariffaIsolaOra, macchine: {}, materiali: {} };
+    Object.keys(S.macchine).forEach(function (id) { o.macchine[id] = S.macchine[id].tariffaOra; });
+    S.materiali.forEach(function (m) { o.materiali[m.id] = m.prezzoKg; });
+    scrivi("schedarioOverride", o);
+  }
+  function ripristinaSchedario() {
+    S.margine = BASE.margine;
+    S.assemblaggi.tariffaIsolaOra = BASE.assemblaggi.tariffaIsolaOra;
+    Object.keys(BASE.macchine).forEach(function (id) { S.macchine[id].tariffaOra = BASE.macchine[id].tariffaOra; });
+    BASE.materiali.forEach(function (b) { trova(S.materiali, b.id).prezzoKg = b.prezzoKg; });
+    scrivi("schedarioOverride", null);
+  }
+
+  /* ---------- Dati di contesto ---------- */
+  var REPARTI = [
+    { id: "tornitura", nome: "Tornitura", desc: "Più di 14 centri di tornitura per pezzi tornati, anche con asse Y e utensili motorizzati." },
+    { id: "fresatura", nome: "Fresatura", desc: "11 centri di fresatura a 3, 4 e 5 assi per componenti prismatici e complessi." },
+    { id: "cavi", nome: "Cavi e Trasmissioni Flessibili", desc: "Funi, terminali, chiusure personalizzate, tiranti per arredo e trasmissioni flessibili." },
+    { id: "assemblaggi", nome: "Assemblaggi", desc: "Sette isole di assemblaggio con pressa e codificatori, per serie piccole e medie." }
+  ];
+  function reparto(id) { return trova(REPARTI, id); }
+
+  var STATI = [
+    { id: "ricevuta", nome: "Ricevuta" },
+    { id: "in-valutazione", nome: "In valutazione" },
+    { id: "offerta-inviata", nome: "Offerta inviata" }
+  ];
+
+  function nuoviDati(rep) {
+    var comuni = { reparto: rep, collaudo: "nessuno", urgenza: "standard" };
+    var d;
+    if (rep === "tornitura") d = { materiale: "acciaio-c45", macchina: "tornio", geometria: { diametro: 30, lunghezza: 80 }, complessita: "media", tolleranza: "standard", finitura: "nessuna", quantita: 50 };
+    else if (rep === "fresatura") d = { materiale: "alu-6082", macchina: "fresa-3", geometria: { x: 100, y: 60, z: 25 }, complessita: "media", tolleranza: "standard", finitura: "nessuna", quantita: 25 };
+    else if (rep === "cavi") d = { prodotto: "fune-inox", diametro: 3, lunghezza: 1000, guaina: "nessuna", terminaleA: "occhiello", terminaleB: "occhiello", quantita: 100 };
+    else d = { componenti: 3, costoComponentiPezzo: 0, opN: { pressatura: 1, avvitatura: 0, codifica: 1, montaggio: 0, controllo: 1 }, quantita: 200 };
+    Object.keys(comuni).forEach(function (k) { d[k] = comuni[k]; });
+    return d;
+  }
+  // Converte i dati del modulo nel formato che capisce il motore dei prezzi
+  function perMotore(d) {
+    var r = JSON.parse(JSON.stringify(d));
+    if (d.reparto === "assemblaggi") {
+      r.operazioni = Object.keys(d.opN).filter(function (k) { return d.opN[k] > 0; }).map(function (k) { return { id: k, n: d.opN[k] }; });
+    }
+    return r;
+  }
+  function calcola(d) { return P.calcola(perMotore(d)); }
+
+  // Descrizione leggibile di una richiesta: elenco di coppie [etichetta, valore]
+  function descrivi(d) {
+    var righe = [["Reparto", reparto(d.reparto).nome]];
+    var mat = d.materiale ? trova(S.materiali, d.materiale) : null;
+    if (d.reparto === "tornitura" || d.reparto === "fresatura") {
+      righe.push(["Macchina", S.macchine[d.macchina].nome]);
+      righe.push(["Materiale", mat.nome]);
+      var g = d.geometria;
+      righe.push(["Misure", d.reparto === "tornitura" ? "Ø " + g.diametro + " × " + g.lunghezza + " mm" : g.x + " × " + g.y + " × " + g.z + " mm"]);
+      if (g.volumeFinito) righe.push(["Volume del pezzo (file)", NUM.format(g.volumeFinito) + " cm³"]);
+      righe.push(["Complessità", trova(S.complessita, d.complessita).nome]);
+      righe.push(["Tolleranze", trova(S.tolleranze, d.tolleranza).nome]);
+      righe.push(["Finitura", trova(S.finiture, d.finitura).nome]);
+    } else if (d.reparto === "cavi") {
+      righe.push(["Prodotto", trova(S.cavi.prodotti, d.prodotto).nome]);
+      righe.push(["Diametro e lunghezza", "Ø " + d.diametro + " mm × " + d.lunghezza + " mm"]);
+      righe.push(["Guaina", trova(S.cavi.guaine, d.guaina).nome]);
+      righe.push(["Terminale A", trova(S.cavi.terminali, d.terminaleA).nome]);
+      righe.push(["Terminale B", trova(S.cavi.terminali, d.terminaleB).nome]);
+    } else {
+      var ops = Object.keys(d.opN).filter(function (k) { return d.opN[k] > 0; }).map(function (k) { return trova(S.assemblaggi.operazioni, k).nome + " ×" + d.opN[k]; });
+      righe.push(["Operazioni", ops.join(", ") || "—"]);
+      righe.push(["Componenti per pezzo", String(d.componenti)]);
+      righe.push(["Costo componenti", d.costoComponentiPezzo > 0 ? eur(d.costoComponentiPezzo) + " / pz" : "Forniti dal cliente"]);
+    }
+    righe.push(["Collaudo", trova(S.collaudi, d.collaudo).nome]);
+    righe.push(["Urgenza", trova(S.urgenze, d.urgenza).nome]);
+    righe.push(["Quantità", d.quantita + " pz"]);
+    return righe;
+  }
+  function titoloPezzo(d) {
+    if (d.reparto === "cavi") return trova(S.cavi.prodotti, d.prodotto).nome + " Ø" + d.diametro + " × " + d.lunghezza + " mm";
+    if (d.reparto === "assemblaggi") return "Assemblaggio (" + d.componenti + " componenti)";
+    var g = d.geometria;
+    return reparto(d.reparto).nome + " in " + trova(S.materiali, d.materiale).nome + (d.reparto === "tornitura" ? " Ø" + g.diametro + " × " + g.lunghezza : " " + g.x + "×" + g.y + "×" + g.z) + " mm";
+  }
+
+  /* ---------- Stato del configuratore ---------- */
+  var cfg = { passo: 1, dati: null, contatti: { azienda: "", nome: "", email: "", telefono: "", note: "" }, accetta: false, errori: {}, inviata: null };
+  var radice = null;      // contenitore #configuratore-app
+  var pannelloPrezzo = null;
+
+  /* ---------- Componenti del modulo ---------- */
+  function gruppoScelte(etichetta, voci, valore, alScelta, aiuto) {
+    var box = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: etichetta }));
+    var scelte = el("div", { class: "scelte", role: "group", "aria-label": etichetta });
+    voci.forEach(function (v) {
+      scelte.appendChild(el("button", {
+        type: "button", class: "scelta", "aria-pressed": String(v.id === valore), disabled: !!v.disabilitata,
+        title: v.disabilitata ? v.disabilitata : null,
+        onclick: function () { alScelta(v.id); }
+      }, v.nome, v.sub ? el("small", { text: v.sub }) : null));
+    });
+    box.appendChild(scelte);
+    if (aiuto) box.appendChild(el("p", { class: "aiuto", text: aiuto }));
+    return box;
+  }
+  function campoNumero(etichetta, valore, unita, alCambio, opz) {
+    opz = opz || {};
+    var id = "f" + Math.random().toString(36).slice(2, 8);
+    var input = el("input", { class: "input", id: id, type: "number", inputmode: "decimal", min: opz.min || 0, step: opz.step || "any", value: valore });
+    input.addEventListener("input", function () { alCambio(parseFloat(input.value.replace(",", "."))); });
+    return el("div", { class: "campo" }, el("label", { for: id, text: etichetta }),
+      el("div", { class: "input-unita" }, input, unita ? el("span", { class: "unita", text: unita }) : null));
+  }
+  function contatore(valore, min, max, alCambio) {
+    var span = el("span", { text: String(valore), "aria-live": "polite" });
+    function vai(delta) { var n = Math.min(max, Math.max(min, valore + delta)); alCambio(n); }
+    return el("div", { class: "contatore" },
+      el("button", { type: "button", "aria-label": "Diminuisci", onclick: function () { vai(-1); } }, "−"), span,
+      el("button", { type: "button", "aria-label": "Aumenta", onclick: function () { vai(1); } }, "+"));
+  }
+  function aggiorna() { disegna(); }                 // ridisegna tutto (cambio di una scelta)
+  function aggiornaPrezzo() { disegnaPrezzo(); }     // solo il prezzo (mentre si digita)
+
+  /* ---------- Passo 1: reparto ---------- */
+  function passoReparto() {
+    var box = el("div", { class: "card cfg-box" }, el("h3", { text: "Che lavorazione ti serve?" }));
+    var griglia = el("div", { class: "reparto-scelta" });
+    REPARTI.forEach(function (r) {
+      griglia.appendChild(el("button", { type: "button", class: "scelta", "aria-pressed": "false", onclick: function () { scegliReparto(r.id); } },
+        r.nome, el("small", { text: r.desc })));
+    });
+    box.appendChild(griglia);
+    return box;
+  }
+  function scegliReparto(id, saltaScroll) {
+    cfg.dati = nuoviDati(id); cfg.passo = 2; cfg.inviata = null; cfg.errori = {};
+    disegna();
+    if (!saltaScroll) vaiA("configuratore");
+  }
+
+  /* ---------- Passo 2: dettagli del pezzo ---------- */
+  function materialiCompatibili() {
+    return S.materiali.map(function (m) { return { id: m.id, nome: m.nome, sub: NUM.format(m.prezzoKg) + " €/kg" }; });
+  }
+  function passoDettagli() {
+    var d = cfg.dati, rep = d.reparto;
+    var box = el("div", { class: "card cfg-box" }, el("h3", { text: reparto(rep).nome + ": descrivi il pezzo" }));
+
+    if (rep === "tornitura" || rep === "fresatura") {
+      var macchine = rep === "tornitura" ? ["tornio", "tornio-y"] : ["fresa-3", "fresa-4", "fresa-5"];
+      box.appendChild(gruppoScelte("Macchina", macchine.map(function (id) { return { id: id, nome: S.macchine[id].nome }; }), d.macchina,
+        function (v) { d.macchina = v; aggiorna(); },
+        rep === "tornitura" ? "Il tornio con asse Y serve se ci sono fresature o fori fuori asse." : "Più assi significa meno riprese, ma una tariffa oraria più alta."));
+      box.appendChild(gruppoScelte("Materiale", materialiCompatibili(), d.materiale, function (v) {
+        d.materiale = v;
+        var f = trova(S.finiture, d.finitura), m = trova(S.materiali, v);
+        if (f.gruppi && f.gruppi.indexOf(m.gruppo) < 0) d.finitura = "nessuna";
+        aggiorna();
+      }));
+      var misure = el("div", { class: "cfg-griglia" });
+      if (rep === "tornitura") {
+        misure.appendChild(campoNumero("Diametro", d.geometria.diametro, "mm", function (v) { d.geometria.diametro = v; aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Lunghezza", d.geometria.lunghezza, "mm", function (v) { d.geometria.lunghezza = v; aggiornaPrezzo(); }));
+      } else {
+        misure.appendChild(campoNumero("Lunghezza X", d.geometria.x, "mm", function (v) { d.geometria.x = v; aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Larghezza Y", d.geometria.y, "mm", function (v) { d.geometria.y = v; aggiornaPrezzo(); }));
+        misure.appendChild(campoNumero("Altezza Z", d.geometria.z, "mm", function (v) { d.geometria.z = v; aggiornaPrezzo(); }));
+      }
+      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: "Misure del pezzo finito (ingombro)" }), misure));
+      box.appendChild(gruppoScelte("Complessità", S.complessita, d.complessita, function (v) { d.complessita = v; aggiorna(); }));
+      box.appendChild(gruppoScelte("Tolleranze", S.tolleranze, d.tolleranza, function (v) { d.tolleranza = v; aggiorna(); }));
+      var mat = trova(S.materiali, d.materiale);
+      box.appendChild(gruppoScelte("Finitura o trattamento", S.finiture.map(function (f) {
+        var no = f.gruppi && f.gruppi.indexOf(mat.gruppo) < 0;
+        return { id: f.id, nome: f.nome, disabilitata: no ? "Non adatta a questo materiale" : null };
+      }), d.finitura, function (v) { d.finitura = v; aggiorna(); }));
+    }
+
+    if (rep === "cavi") {
+      var C = S.cavi, prod = trova(C.prodotti, d.prodotto);
+      box.appendChild(gruppoScelte("Prodotto", C.prodotti, d.prodotto, function (v) {
+        d.prodotto = v; var p = trova(C.prodotti, v);
+        if (p.diametri.indexOf(d.diametro) < 0) d.diametro = p.diametri[Math.min(1, p.diametri.length - 1)];
+        aggiorna();
+      }));
+      box.appendChild(gruppoScelte("Diametro", prod.diametri.map(function (x) { return { id: x, nome: x + " mm" }; }), d.diametro, function (v) { d.diametro = v; aggiorna(); }));
+      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Lunghezza", d.lunghezza, "mm", function (v) { d.lunghezza = v; aggiornaPrezzo(); })));
+      box.appendChild(gruppoScelte("Guaina", C.guaine, d.guaina, function (v) { d.guaina = v; aggiorna(); }));
+      box.appendChild(gruppoScelte("Terminale lato A", C.terminali.map(function (t) { return { id: t.id, nome: t.nome }; }), d.terminaleA, function (v) { d.terminaleA = v; aggiorna(); }));
+      box.appendChild(gruppoScelte("Terminale lato B", C.terminali.map(function (t) { return { id: t.id, nome: t.nome }; }), d.terminaleB, function (v) { d.terminaleB = v; aggiorna(); }));
+    }
+
+    if (rep === "assemblaggi") {
+      var opBox = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: "Operazioni sull'isola di assemblaggio (per pezzo)" }));
+      S.assemblaggi.operazioni.forEach(function (op) {
+        opBox.appendChild(el("div", { class: "campo", style: "grid-template-columns:1fr auto;align-items:center" },
+          el("span", { text: op.nome }), contatore(d.opN[op.id], 0, 20, function (n) { d.opN[op.id] = n; aggiorna(); })));
+      });
+      box.appendChild(opBox);
+      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: "Componenti per pezzo" }), contatore(d.componenti, 0, 100, function (n) { d.componenti = n; aggiorna(); })));
+      box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Costo dei componenti, per pezzo (0 se li fornisce il cliente)", d.costoComponentiPezzo, "€", function (v) { d.costoComponentiPezzo = v; aggiornaPrezzo(); })));
+    }
+
+    box.appendChild(gruppoScelte("Collaudo", S.collaudi, d.collaudo, function (v) { d.collaudo = v; aggiorna(); }));
+    box.appendChild(gruppoScelte("Urgenza", S.urgenze.map(function (u) { return { id: u.id, nome: u.nome, sub: u.sovrapprezzo ? "+" + Math.round(u.sovrapprezzo * 100) + "%" : "tempi normali" }; }), d.urgenza, function (v) { d.urgenza = v; aggiorna(); }));
+    box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Quantità", d.quantita, "pz", function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); aggiornaPrezzo(); }, { min: 1, step: 1 })));
+
+    var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { cfg.passo = 3; disegna(); vaiA("configuratore"); } }, "Continua", el("span", { "aria-hidden": "true", text: "→" }));
+    box.appendChild(el("div", { class: "cfg-azioni" },
+      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.passo = 1; disegna(); } }, "← Cambia reparto"), avanti));
+    return box;
+  }
+
+  /* ---------- Pannello prezzo ---------- */
+  var COLORI = { materiale: "#0069b4", lavorazione: "#263272", attrezzaggio: "#5b8fd6", finitura: "#7a8bb5", collaudo: "#9bb7e0", urgenza: "#d98b1f", margine: "#8f9ab5" };
+  var NOMI_VOCI = { materiale: "Materiale", lavorazione: "Lavorazione", attrezzaggio: "Attrezzaggio macchina", finitura: "Finitura", collaudo: "Collaudo", urgenza: "Urgenza", margine: "Margine" };
+
+  function pannelloPrezzoDOM(d, opz) {
+    opz = opz || {};
+    var c = calcola(d);
+    var box = el("div", { class: "stack" });
+    if (c.errore) {
+      box.appendChild(el("p", { class: "prezzo-vuoto", text: "Completa i dati per vedere il prezzo." }));
+      box.appendChild(el("div", { class: "avviso avviso-errore", role: "status", text: c.errore }));
+      return { dom: box, calc: c };
+    }
+    box.appendChild(el("div", { class: "prezzo-grande", text: eur(c.da) + " – " + eur(c.a) }));
+    box.appendChild(el("p", { class: "prezzo-sotto", text: "per " + c.quantita + " pz · circa " + eur(c.perPezzo) + " al pezzo" }));
+
+    var tot = 0; Object.keys(c.voci).forEach(function (k) { tot += c.voci[k]; });
+    var barra = el("div", { class: "barra", "aria-hidden": "true" });
+    Object.keys(c.voci).forEach(function (k) { if (c.voci[k] > 0) barra.appendChild(el("i", { style: "width:" + (c.voci[k] / tot * 100) + "%;background:" + COLORI[k] })); });
+    box.appendChild(barra);
+    var voci = el("ul", { class: "voci" });
+    Object.keys(c.voci).forEach(function (k) { if (c.voci[k] > 0) voci.appendChild(el("li", null, el("span", { text: NOMI_VOCI[k] }), el("span", { text: eur(c.voci[k]) }))); });
+    voci.appendChild(el("li", null, el("strong", { text: "Totale calcolato" }), el("strong", { text: eur(c.totale) })));
+    box.appendChild(voci);
+
+    box.appendChild(el("div", { class: "dati-rapidi" },
+      el("div", null, el("strong", { text: "~" + c.giorni + " gg" }), el("span", { text: "consegna" })),
+      el("div", null, el("strong", { text: NUM.format(c.ore) + " h" }), el("span", { text: "lavorazione" })),
+      el("div", null, el("strong", { text: c.pesoPezzoKg ? NUM.format(c.pesoPezzoKg) + " kg" : "—" }), el("span", { text: "peso pezzo" }))));
+
+    if (!opz.senzaTabella) {
+      var quantita = [1, 10, 25, 50, 100, 250, 500];
+      if (quantita.indexOf(c.quantita) < 0) { quantita.push(c.quantita); quantita.sort(function (a, b) { return a - b; }); }
+      var righe = P.tabellaQuantita(perMotore(d), quantita);
+      var tab = el("table", { class: "tab-quantita" }, el("thead", null, el("tr", null, el("th", { text: "Quantità" }), el("th", { text: "€ / pezzo" }), el("th", { text: "Totale" }))));
+      var tb = el("tbody");
+      righe.forEach(function (r) {
+        tb.appendChild(el("tr", { class: r.quantita === c.quantita ? "corrente" : null }, el("td", { text: r.quantita + " pz" }), el("td", { text: eur(r.perPezzo) }), el("td", { text: eur(r.totale) })));
+      });
+      tab.appendChild(tb);
+      box.appendChild(el("span", { class: "etichetta", text: "Confronto quantità" }));
+      box.appendChild(tab);
+    }
+    c.avvisi.forEach(function (a) { box.appendChild(el("div", { class: "avviso", role: "status", text: a })); });
+    if (c.note.length) box.appendChild(el("ul", { class: "note-prezzo" }, c.note.map(function (n) { return el("li", { text: n }); })));
+    return { dom: box, calc: c };
+  }
+  function disegnaPrezzo() {
+    if (!pannelloPrezzo) return;
+    var r = pannelloPrezzoDOM(cfg.dati);
+    svuota(pannelloPrezzo.corpo); pannelloPrezzo.corpo.appendChild(r.dom);
+    var b = document.getElementById("btn-avanti"); if (b) b.disabled = !!r.calc.errore;
+  }
+
+  /* ---------- Passo 3: riepilogo e invio ---------- */
+  function campoTesto(etichetta, chiave, opz) {
+    opz = opz || {};
+    var id = "c" + chiave;
+    var input = opz.area ? el("textarea", { class: "input", id: id, rows: 3 }) : el("input", { class: "input", id: id, type: opz.tipo || "text", autocomplete: opz.auto || "off" });
+    input.value = cfg.contatti[chiave];
+    input.addEventListener("input", function () { cfg.contatti[chiave] = input.value; });
+    return el("div", { class: "campo" }, el("label", { for: id, text: etichetta + (opz.obbl ? " *" : "") }), input,
+      cfg.errori[chiave] ? el("span", { class: "errore-campo", role: "alert", text: cfg.errori[chiave] }) : null);
+  }
+  function passoInvio() {
+    var d = cfg.dati;
+    var box = el("div", { class: "card cfg-box" }, el("h3", { text: "Riepilogo e invio" }));
+    var dl = el("dl", { class: "riepilogo" });
+    descrivi(d).forEach(function (r) { dl.appendChild(el("div", null, el("dt", { text: r[0] }), el("dd", { text: r[1] }))); });
+    box.appendChild(dl);
+    box.appendChild(el("h3", { text: "I tuoi dati" }));
+    box.appendChild(el("div", { class: "cfg-griglia" }, campoTesto("Nome e cognome", "nome", { obbl: true, auto: "name" }), campoTesto("Azienda", "azienda", { auto: "organization" }), campoTesto("Email", "email", { obbl: true, tipo: "email", auto: "email" })));
+    box.appendChild(campoTesto("Telefono", "telefono", { tipo: "tel", auto: "tel" }));
+    box.appendChild(campoTesto("Note per l'ufficio tecnico", "note", { area: true }));
+    var chk = el("input", { type: "checkbox", id: "chk-privacy" }); chk.checked = cfg.accetta;
+    chk.addEventListener("change", function () { cfg.accetta = chk.checked; });
+    box.appendChild(el("div", { class: "campo" }, el("label", { for: "chk-privacy", style: "display:flex;gap:.6rem;align-items:flex-start;text-transform:none;letter-spacing:0;font-weight:500;font-size:.9rem" }, chk,
+      "Acconsento al trattamento dei dati per la richiesta di offerta (demo: i dati restano nel tuo browser). *"),
+      cfg.errori.privacy ? el("span", { class: "errore-campo", role: "alert", text: cfg.errori.privacy }) : null));
+    box.appendChild(el("div", { class: "cfg-azioni" },
+      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.passo = 2; disegna(); } }, "← Modifica il pezzo"),
+      el("button", { type: "button", class: "btn btn-primario", id: "btn-invia", onclick: invia }, "Invia la richiesta", el("span", { "aria-hidden": "true", text: "→" }))));
+    return box;
+  }
+  function invia() {
+    var c = cfg.contatti, err = {};
+    if (!c.nome.trim()) err.nome = "Scrivi il tuo nome.";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email.trim())) err.email = "Scrivi un'email valida.";
+    if (!cfg.accetta) err.privacy = "Serve il consenso per inviare la richiesta.";
+    cfg.errori = err;
+    if (Object.keys(err).length) { disegna(); var p = document.querySelector(".errore-campo"); if (p) p.scrollIntoView({ block: "center" }); return; }
+    if (cfg.inviata) return; // evita un secondo invio dello stesso modulo
+    var btn = document.getElementById("btn-invia"); if (btn) btn.disabled = true;
+    var richieste = leggi("richieste", []);
+    var n = richieste.reduce(function (m, r) { return Math.max(m, parseInt(r.id.slice(4), 10) || 0); }, 0) + 1;
+    var rec = {
+      id: "RIC-" + ("0000" + n).slice(-4), creata: new Date().toISOString(), stato: "ricevuta", demo: false,
+      cliente: { azienda: c.azienda.trim(), nome: c.nome.trim(), email: c.email.trim(), telefono: c.telefono.trim(), note: c.note.trim() },
+      dati: JSON.parse(JSON.stringify(cfg.dati)), prezzo: calcola(cfg.dati), ritocco: 0, offerta: null
+    };
+    richieste.push(rec);
+    scrivi("richieste", richieste);
+    cfg.inviata = rec.id; cfg.passo = 4;
+    disegna(); vaiA("configuratore");
+  }
+  function passoFatto() {
+    return el("div", { class: "card cfg-box successo" },
+      el("span", { class: "badge badge-ok", text: "Richiesta inviata" }),
+      el("h3", { text: "Grazie, abbiamo ricevuto la richiesta " + cfg.inviata }),
+      el("p", { text: "L'ufficio tecnico verifica il disegno e ti risponde con l'offerta ufficiale. Per vedere come la riceve e la elabora l'azienda, apri la vista Artigiancavi." }),
+      el("div", { class: "hero-bottoni", style: "justify-content:center" },
+        el("button", { type: "button", class: "btn btn-primario", onclick: function () { location.hash = "#/azienda/" + cfg.inviata; } }, "Vai alla vista azienda →"),
+        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.passo = 1; cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; disegna(); } }, "Nuova richiesta")));
+  }
+
+  /* ---------- Disegno del configuratore ---------- */
+  function disegna() {
+    if (!radice) return;
+    var attivo = document.activeElement && document.activeElement.id;
+    svuota(radice); pannelloPrezzo = null;
+    var nomi = ["Reparto", "Il pezzo", "Invio"];
+    var barra = el("ol", { class: "cfg-passi", style: "list-style:none;padding:0;margin:0 0 1.5rem" });
+    nomi.forEach(function (n, i) {
+      var num = i + 1, stato = cfg.passo === num ? "attivo" : (cfg.passo > num ? "fatto" : "");
+      barra.appendChild(el("li", { class: "cfg-passo " + stato, "aria-current": cfg.passo === num ? "step" : null }, el("b", { text: cfg.passo > num ? "✓" : String(num) }), el("span", { text: n })));
+    });
+    radice.appendChild(barra);
+
+    var griglia = el("div", { class: cfg.passo === 2 ? "cfg" : null });
+    if (cfg.passo === 1) griglia.appendChild(passoReparto());
+    else if (cfg.passo === 2) {
+      griglia.appendChild(passoDettagli());
+      var corpo = el("div");
+      var side = el("aside", { class: "card prezzo", "aria-label": "Stima del prezzo" }, el("h3", { text: "Stima indicativa" }), corpo);
+      pannelloPrezzo = { corpo: corpo };
+      griglia.appendChild(side);
+    } else if (cfg.passo === 3) griglia.appendChild(passoInvio());
+    else griglia.appendChild(passoFatto());
+    radice.appendChild(griglia);
+    if (cfg.passo === 2) disegnaPrezzo();
+    if (attivo) { var e = document.getElementById(attivo); if (e && e.focus) e.focus(); }
+  }
+
+  /* ==========================================================================
+     VISTA AZIENDA
+     ========================================================================== */
+  var az = { tab: "richieste", sel: null };
+
+  function seedRichieste() {
+    if (leggi("richieste", null) !== null) return;
+    function r(id, giorniFa, cliente, dati, stato) {
+      var d = new Date(Date.now() - giorniFa * 86400000).toISOString();
+      return { id: id, creata: d, stato: stato, demo: true, cliente: cliente, dati: dati, prezzo: calcola(dati), ritocco: 0, offerta: null };
+    }
+    var a = nuoviDati("tornitura"); a.materiale = "inox-304"; a.geometria = { diametro: 20, lunghezza: 100 }; a.tolleranza = "precisa"; a.finitura = "passivazione"; a.collaudo = "dimensionale"; a.quantita = 50;
+    var b = nuoviDati("fresatura"); b.macchina = "fresa-5"; b.materiale = "alu-6082"; b.geometria = { x: 150, y: 100, z: 20, volumeFinito: 255.7 }; b.complessita = "complessa"; b.tolleranza = "alta"; b.finitura = "anodizzazione"; b.collaudo = "cmm"; b.urgenza = "rapida"; b.quantita = 10;
+    var c = nuoviDati("cavi"); c.prodotto = "fune-inox"; c.diametro = 4; c.lunghezza = 1500; c.guaina = "pvc"; c.terminaleA = "occhiello"; c.terminaleB = "forcella"; c.quantita = 300;
+    scrivi("richieste", [
+      r("RIC-0001", 3, { azienda: "Meccanica Rossi (esempio)", nome: "Luca Rossi", email: "luca@esempio.it", telefono: "", note: "Serve certificato materiale." }, c, "ricevuta"),
+      r("RIC-0002", 2, { azienda: "Officine Bianchi (esempio)", nome: "Anna Bianchi", email: "anna@esempio.it", telefono: "", note: "" }, a, "in-valutazione"),
+      r("RIC-0003", 1, { azienda: "Tecno Verdi (esempio)", nome: "Marco Verdi", email: "marco@esempio.it", telefono: "", note: "Disegno allegato in STEP." }, b, "ricevuta")
+    ]);
+  }
+  function richieste() { return leggi("richieste", []); }
+  function salvaRichiesta(rec) {
+    var l = richieste(); for (var i = 0; i < l.length; i++) if (l[i].id === rec.id) l[i] = rec; scrivi("richieste", l);
+  }
+  function dataBreve(iso) { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); } catch (e) { return ""; } }
+
+  function rispostaAutomatica(rec, calc, offertaTot) {
+    var q = rec.dati.quantita, per = offertaTot / q;
+    return "Gentile " + rec.cliente.nome + ",\n" +
+      "abbiamo ricevuto la sua richiesta " + rec.id + " per " + q + " pz: " + titoloPezzo(rec.dati) + ".\n" +
+      "In base ai nostri costi e tempi di lavorazione, la nostra offerta è di " + eur(offertaTot) + " (" + eur(per) + " al pezzo, IVA esclusa).\n" +
+      "Consegna prevista in circa " + calc.giorni + " giorni lavorativi dalla conferma d'ordine.\n" +
+      "L'offerta è valida 30 giorni e resta soggetta alla verifica finale del disegno.\n" +
+      "Cordiali saluti,\nUfficio commerciale";
+  }
+
+  function disegnaAzienda() {
+    var cont = document.getElementById("vista-azienda"); svuota(cont);
+    seedRichieste();
+    var lista = richieste();
+    var wrap = el("div", { class: "contenitore az" });
+    wrap.appendChild(el("div", { class: "az-barra" }, el("div", null, el("p", { class: "sopratitolo", text: "Vista azienda" }), el("h2", { text: "Richieste ricevute" })),
+      el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { location.hash = "#/"; } }, "← Torna al sito")));
+    wrap.appendChild(el("div", { class: "az-banner", text: "È quello che vede l'ufficio di Artigiancavi: ogni richiesta arriva già con il prezzo calcolato dallo schedario dei costi. L'ufficio controlla, ritocca se vuole e invia l'offerta." }));
+    var tabs = el("div", { class: "az-tabs", role: "tablist" });
+    [["richieste", "Richieste (" + lista.length + ")"], ["schedario", "Schedario dei costi"]].forEach(function (t) {
+      tabs.appendChild(el("button", { type: "button", role: "tab", class: "scelta", "aria-pressed": String(az.tab === t[0]), "aria-selected": String(az.tab === t[0]), onclick: function () { az.tab = t[0]; disegnaAzienda(); } }, t[1]));
+    });
+    wrap.appendChild(tabs);
+    wrap.appendChild(az.tab === "richieste" ? tabRichieste(lista) : tabSchedario());
+    cont.appendChild(wrap);
+  }
+
+  function tabRichieste(lista) {
+    var ordinate = lista.slice().sort(function (a, b) { return b.creata < a.creata ? -1 : 1; });
+    if (!ordinate.length) return el("div", { class: "card az-dettaglio" }, el("p", { text: "Nessuna richiesta." }));
+    if (!az.sel || !trova(lista, az.sel)) az.sel = ordinate[0].id;
+    var elenco = el("div", { class: "az-elenco" });
+    ordinate.forEach(function (r) {
+      var stato = trova(STATI, r.stato);
+      elenco.appendChild(el("button", { type: "button", class: "az-voce", "aria-current": String(r.id === az.sel), onclick: function () { az.sel = r.id; history.replaceState(null, "", "#/azienda/" + r.id); disegnaAzienda(); } },
+        el("span", { class: "riga" }, el("span", { class: "id", text: r.id }), el("span", { text: dataBreve(r.creata) })),
+        el("span", { class: "riga" }, el("span", { text: r.cliente.azienda || r.cliente.nome })),
+        el("span", { class: "riga" }, el("span", { text: reparto(r.dati.reparto).nome + " · " + r.dati.quantita + " pz" }), el("strong", { text: eur(r.prezzo.totale) })),
+        el("span", null, el("span", { class: "badge " + (r.stato === "offerta-inviata" ? "badge-ok" : "badge-blu"), text: stato.nome }))));
+    });
+    return el("div", { class: "az-layout" }, elenco, dettaglioRichiesta(trova(lista, az.sel)));
+  }
+
+  function dettaglioRichiesta(rec) {
+    var calc = calcola(rec.dati);
+    var box = el("div", { class: "card az-dettaglio" });
+    box.appendChild(el("h3", { text: rec.id + " · " + (rec.cliente.azienda || rec.cliente.nome) }));
+    box.appendChild(el("p", { class: "aiuto", text: rec.cliente.nome + " · " + rec.cliente.email + (rec.cliente.telefono ? " · " + rec.cliente.telefono : "") }));
+    if (rec.cliente.note) box.appendChild(el("p", { text: "Note del cliente: " + rec.cliente.note }));
+
+    var sez1 = el("div", { class: "az-sezione" }, el("h4", { text: "Cosa ha chiesto" }));
+    var dl = el("dl", { class: "riepilogo" });
+    descrivi(rec.dati).forEach(function (r) { dl.appendChild(el("div", null, el("dt", { text: r[0] }), el("dd", { text: r[1] }))); });
+    sez1.appendChild(dl); box.appendChild(sez1);
+
+    var sez2 = el("div", { class: "az-sezione" }, el("h4", { text: "Calcolo automatico dallo schedario" }));
+    if (calc.errore) sez2.appendChild(el("div", { class: "avviso avviso-errore", text: calc.errore }));
+    else {
+      var r2 = pannelloPrezzoDOM(rec.dati, { senzaTabella: true });
+      sez2.appendChild(r2.dom);
+      if (Math.abs(calc.totale - rec.prezzo.totale) > 0.01) sez2.appendChild(el("div", { class: "avviso", text: "Lo schedario è cambiato dopo l'invio: al cliente era stata mostrata una stima di " + eur(rec.prezzo.totale) + ". Qui vale il calcolo aggiornato." }));
+    }
+    box.appendChild(sez2);
+    if (calc.errore) return box;
+
+    var offertaTot = Math.round(calc.totale * (1 + rec.ritocco / 100) * 100) / 100;
+    var sez3 = el("div", { class: "az-sezione" }, el("h4", { text: "Risposta al cliente" }));
+    sez3.appendChild(el("div", { class: "az-azioni", style: "margin:0 0 1rem" },
+      el("span", { class: "etichetta", text: "Ritocco sul prezzo" }),
+      el("div", { class: "contatore" },
+        el("button", { type: "button", "aria-label": "Riduci del 1%", onclick: function () { rec.ritocco = Math.max(-20, rec.ritocco - 1); salvaRichiesta(rec); disegnaAzienda(); } }, "−"),
+        el("span", { style: "min-width:4rem", text: (rec.ritocco > 0 ? "+" : "") + rec.ritocco + "%" }),
+        el("button", { type: "button", "aria-label": "Aumenta dell'1%", onclick: function () { rec.ritocco = Math.min(30, rec.ritocco + 1); salvaRichiesta(rec); disegnaAzienda(); } }, "+")),
+      el("strong", { text: "Offerta: " + eur(offertaTot) })));
+    sez3.appendChild(el("div", { class: "risposta", text: rispostaAutomatica(rec, calc, offertaTot) }));
+    sez3.appendChild(el("div", { class: "az-azioni" },
+      rec.stato !== "in-valutazione" && rec.stato !== "offerta-inviata" ? el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { rec.stato = "in-valutazione"; salvaRichiesta(rec); disegnaAzienda(); } }, "Segna in valutazione") : null,
+      rec.stato === "offerta-inviata"
+        ? el("span", { class: "badge badge-ok", text: "Offerta inviata" + (rec.offerta ? " · " + eur(rec.offerta.totale) : "") })
+        : el("button", { type: "button", class: "btn btn-primario btn-sm", onclick: function () {
+            rec.stato = "offerta-inviata"; rec.offerta = { totale: offertaTot, giorni: calc.giorni, data: new Date().toISOString() };
+            salvaRichiesta(rec); disegnaAzienda();
+          } }, "Invia offerta al cliente")));
+    box.appendChild(sez3);
+    return box;
+  }
+
+  function tabSchedario() {
+    var cont = el("div");
+    cont.appendChild(el("p", { class: "aiuto", text: "Qui l'azienda modifica i costi di base. Ogni modifica cambia subito i prezzi calcolati, sia nel configuratore sia nelle richieste. In una versione reale questo schedario viene importato dai dati aziendali." }));
+    function tabella(titolo, righe, nota) {
+      var t = el("table", { class: "schedario-tab" });
+      righe.forEach(function (r) {
+        var input = el("input", { class: "input", type: "number", min: 0, step: "any", value: r.valore, "aria-label": r.nome });
+        input.addEventListener("change", function () { var v = parseFloat(input.value.replace(",", ".")); if (isFinite(v) && v >= 0) { r.salva(v); salvaOverride(); } disegnaAzienda(); });
+        t.appendChild(el("tr", null, el("td", { text: r.nome }), el("td", null, input), el("td", { class: "aiuto", text: r.unita })));
+      });
+      return el("div", { class: "card schedario-blocco" }, el("h3", { text: titolo }), nota ? el("p", { class: "aiuto", text: nota }) : null, t);
+    }
+    cont.appendChild(tabella("Tariffe orarie macchine", Object.keys(S.macchine).map(function (id) {
+      return { nome: S.macchine[id].nome, valore: S.macchine[id].tariffaOra, unita: "€ / ora", salva: function (v) { S.macchine[id].tariffaOra = v; } };
+    }).concat([{ nome: "Isola di assemblaggio", valore: S.assemblaggi.tariffaIsolaOra, unita: "€ / ora", salva: function (v) { S.assemblaggi.tariffaIsolaOra = v; } }])));
+    cont.appendChild(tabella("Materiali (prezzo del grezzo)", S.materiali.map(function (m) {
+      return { nome: m.nome, valore: m.prezzoKg, unita: "€ / kg", salva: function (v) { m.prezzoKg = v; } };
+    })));
+    cont.appendChild(tabella("Margine aziendale", [{ nome: "Margine sul costo", valore: Math.round(S.margine * 100), unita: "%", salva: function (v) { S.margine = v / 100; } }]));
+    cont.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { ripristinaSchedario(); disegnaAzienda(); } }, "Ripristina i valori demo"));
+    cont.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", style: "margin-left:.6rem", onclick: function () { scrivi("richieste", null); try { localStorage.removeItem("richieste"); } catch (e) { /* ok */ } az.sel = null; disegnaAzienda(); } }, "Ripristina le richieste di esempio"));
+    return cont;
+  }
+
+  /* ==========================================================================
+     NAVIGAZIONE, TEMA, MENU
+     ========================================================================== */
+  function vaiA(id) {
+    var e = document.getElementById(id);
+    if (e) e.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+  function route() {
+    var h = location.hash || "#/";
+    var inAzienda = h.indexOf("#/azienda") === 0;
+    document.getElementById("vista-pubblica").hidden = inAzienda;
+    document.getElementById("vista-azienda").hidden = !inAzienda;
+    document.getElementById("btn-vista-azienda").textContent = inAzienda ? "Torna al sito" : "Vista azienda";
+    if (inAzienda) {
+      var m = h.match(/^#\/azienda\/(RIC-\d+)/); if (m) { az.sel = m[1]; az.tab = "richieste"; }
+      disegnaAzienda(); window.scrollTo(0, 0);
+    } else if (h.length > 2 && h.charAt(1) !== "/") {
+      setTimeout(function () { vaiA(h.slice(1)); }, 0);
+    } else { window.scrollTo(0, 0); }
+    document.getElementById("menu").classList.remove("aperto");
+    document.getElementById("btn-menu").setAttribute("aria-expanded", "false");
+  }
+
+  function avvio() {
+    applicaOverride();
+    radice = document.getElementById("configuratore-app");
+
+    var griglia = document.getElementById("griglia-reparti");
+    REPARTI.forEach(function (r) {
+      griglia.appendChild(el("button", { type: "button", class: "reparto-tile", onclick: function () { scegliReparto(r.id); } },
+        el("div", null, el("h3", { text: r.nome }), el("p", { text: r.desc })), el("span", { class: "vai", text: "Configura →" })));
+    });
+
+    document.getElementById("btn-vista-azienda").addEventListener("click", function () {
+      location.hash = (location.hash.indexOf("#/azienda") === 0) ? "#/" : "#/azienda";
+    });
+    document.getElementById("btn-tema").addEventListener("click", function () {
+      var nuovo = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", nuovo);
+      try { localStorage.setItem("tema", nuovo); } catch (e) { /* ok */ }
+    });
+    document.getElementById("btn-menu").addEventListener("click", function () {
+      var m = document.getElementById("menu"), aperto = m.classList.toggle("aperto");
+      this.setAttribute("aria-expanded", String(aperto));
+    });
+    document.querySelectorAll("[data-vai]").forEach(function (a) {
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (location.hash.indexOf("#/azienda") === 0) { location.hash = "#" + a.getAttribute("data-vai"); }
+        else { vaiA(a.getAttribute("data-vai")); document.getElementById("menu").classList.remove("aperto"); }
+      });
+    });
+    window.addEventListener("hashchange", route);
+
+    // Collegamento diretto per prove: ?reparto=tornitura  (apre il passo 2)
+    var q = new URLSearchParams(location.search), rp = q.get("reparto");
+    if (rp && reparto(rp)) { cfg.dati = nuoviDati(rp); cfg.passo = 2; }
+    disegna();
+    route();
+  }
+
+  document.addEventListener("DOMContentLoaded", avvio);
+})();

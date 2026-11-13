@@ -1,21 +1,119 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Demo configuratore</title>
-<style>
-  html, body { height: 100%; margin: 0; }
-  body { display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; background: #fff; color: #0b3b75; text-align: center; padding: 16px; box-sizing: border-box; }
-  h1 { font-size: clamp(1.4rem, 5vw, 2.2rem); letter-spacing: .04em; margin: 0 0 .5rem; }
-  p { margin: 0; color: #555; }
-</style>
+<meta name="theme-color" content="#263272">
+<title>Configuratore lavorazioni | Demo</title>
+<script>
+  /* Tema scelto prima del disegno della pagina, per evitare il lampo bianco/scuro */
+  (function () {
+    try {
+      var t = localStorage.getItem("tema");
+      if (t !== "dark" && t !== "light") t = "light"; /* predefinito chiaro, come il sito originale */
+      document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div>
-    <h1>Demo in costruzione</h1>
-    <p>La pagina sarà online a breve.</p>
+
+<header class="top" id="top">
+  <a class="logo" href="#/" aria-label="Home">
+    <img class="logo-chiaro" src="img/logo.svg" alt="Artigiancavi" height="40">
+    <img class="logo-scuro" src="img/logo-bianco.svg" alt="" height="40">
+  </a>
+  <nav class="menu" id="menu" aria-label="Principale">
+    <a href="#reparti" data-vai="reparti">Lavorazioni</a>
+    <a href="#come" data-vai="come">Come funziona</a>
+    <a href="#configuratore" data-vai="configuratore">Configuratore</a>
+  </nav>
+  <div class="top-azioni">
+    <button class="btn btn-ghost btn-sm" id="btn-vista-azienda" type="button">Vista azienda</button>
+    <button class="icona" id="btn-tema" type="button" aria-label="Cambia tema chiaro/scuro">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A6 6 0 0 1 12.4 3.1 9 9 0 0 0 12 3z"/></svg>
+    </button>
+    <button class="icona solo-mobile" id="btn-menu" type="button" aria-label="Apri il menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </button>
   </div>
+</header>
+
+<main id="vista-pubblica">
+
+  <section class="hero">
+    <div class="hero-griglia" aria-hidden="true"></div>
+    <div class="contenitore hero-testo">
+      <p class="sopratitolo">Lavorazioni meccaniche di precisione · Trento</p>
+      <h1>Configura il tuo pezzo.<br><span class="contorno">Ricevi subito il prezzo.</span></h1>
+      <p class="lead">Tornitura, fresatura, cavi e trasmissioni flessibili, assemblaggi: su disegno, in piccole e medie serie. Descrivi il pezzo o carica il file e ottieni una stima immediata, con il dettaglio dei costi.</p>
+      <div class="hero-bottoni">
+        <a class="btn btn-primario" href="#configuratore" data-vai="configuratore">Configura e richiedi offerta <span aria-hidden="true">→</span></a>
+        <a class="btn btn-contorno" href="#reparti" data-vai="reparti">Scopri le lavorazioni</a>
+      </div>
+      <ul class="hero-punti">
+        <li><strong>40+</strong> anni di esperienza</li>
+        <li><strong>25</strong> centri di tornitura e fresatura</li>
+        <li><strong>3D</strong> misura e collaudo interni</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sezione" id="reparti">
+    <div class="contenitore">
+      <p class="sopratitolo">Lavorazioni</p>
+      <h2>Quattro reparti, un solo configuratore</h2>
+      <div class="reparti" id="griglia-reparti"></div>
+    </div>
+  </section>
+
+  <section class="sezione sezione-grigia" id="come">
+    <div class="contenitore">
+      <p class="sopratitolo">Come funziona</p>
+      <h2>Dalla richiesta all'offerta in tre passi</h2>
+      <ol class="passi">
+        <li><span class="passo-n">1</span><h3>Descrivi il pezzo</h3><p>Scegli il reparto, il materiale e le misure. Puoi caricare il disegno in formato STEP o PDF.</p></li>
+        <li><span class="passo-n">2</span><h3>Vedi la stima</h3><p>Il prezzo si aggiorna mentre scegli: materiale, lavorazione, attrezzaggio, finiture e tempi di consegna.</p></li>
+        <li><span class="passo-n">3</span><h3>Ricevi l'offerta</h3><p>L'ufficio verifica il disegno e conferma l'offerta ufficiale. La stima non è vincolante.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="sezione sezione-blu" id="numeri">
+    <div class="contenitore numeri">
+      <div><strong>14+</strong><span>centri di tornitura</span></div>
+      <div><strong>11</strong><span>centri di fresatura</span></div>
+      <div><strong>7</strong><span>isole di assemblaggio</span></div>
+      <div><strong>2</strong><span>macchine di misura 3D</span></div>
+    </div>
+  </section>
+
+  <section class="sezione" id="configuratore">
+    <div class="contenitore">
+      <p class="sopratitolo">Configuratore</p>
+      <h2>Richiedi un'offerta</h2>
+      <p class="intro">Il prezzo mostrato è indicativo e calcolato sui costi di esempio di questa demo. L'offerta ufficiale viene preparata dopo la verifica del disegno.</p>
+      <div id="configuratore-app"></div>
+    </div>
+  </section>
+
+</main>
+
+<main id="vista-azienda" hidden></main>
+
+<footer class="piede">
+  <div class="contenitore">
+    <p><strong>Demo dimostrativa.</strong> Prezzi, tempi e dati sono di esempio e non rappresentano offerte reali. I file caricati restano nel tuo browser e non vengono inviati a nessun server.</p>
+  </div>
+</footer>
+
+<script src="js/schedario.js"></script>
+<script src="js/prezzi.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
