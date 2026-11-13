@@ -341,7 +341,12 @@
     var dl = el("dl", { class: "riepilogo" });
     descrivi(d).forEach(function (r) { dl.appendChild(el("div", null, el("dt", { text: r[0] }), el("dd", { text: r[1] }))); });
     box.appendChild(dl);
-    box.appendChild(el("h3", { text: "I tuoi dati" }));
+    box.appendChild(el("div", { class: "az-barra", style: "margin-bottom:.8rem" },
+      el("h3", { text: "I tuoi dati", style: "margin:0" }),
+      el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () {
+        cfg.contatti = { azienda: "Azienda di prova", nome: "Mario Rossi", email: "mario.rossi@esempio.it", telefono: "0461 000000", note: "Richiesta di prova per la demo." };
+        cfg.accetta = true; cfg.errori = {}; disegna();
+      } }, "Compila con dati di prova")));
     box.appendChild(el("div", { class: "cfg-griglia" }, campoTesto("Nome e cognome", "nome", { obbl: true, auto: "name" }), campoTesto("Azienda", "azienda", { auto: "organization" }), campoTesto("Email", "email", { obbl: true, tipo: "email", auto: "email" })));
     box.appendChild(campoTesto("Telefono", "telefono", { tipo: "tel", auto: "tel" }));
     box.appendChild(campoTesto("Note per l'ufficio tecnico", "note", { area: true }));
