@@ -143,9 +143,10 @@ html[data-theme="dark"] .btn-primario:hover:not([disabled]) { background: linear
 .hero-corpo { position: relative; display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); gap: 2rem; align-items: center; padding: 3.5rem 0; }
 .hero-testo { position: relative; z-index: 2; }
 .hero .sopratitolo { color: #7ee8fa; }
-/* Archivo (e non Montserrat) nel titolo: il contorno vuoto di Montserrat mostra righe interne alle lettere */
-.hero h1 { font-family: "Archivo", var(--font); color: #fff; font-size: clamp(2.2rem, 4.6vw, 4.2rem); font-weight: 800; letter-spacing: .01em; line-height: 1.04; text-transform: uppercase; }
-.hero h1 .contorno { color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, .85); }
+/* Titolo nello stile del sito Artigiancavi: carattere largo e pieno (Archivo esteso), maiuscole solo iniziali, bianco con parte finale in azzurro pieno.
+   Niente testo a contorno e niente tutto maiuscolo: la grafica deve restare quella di Artigiancavi. */
+.hero h1 { font-family: "Archivo", var(--font); font-stretch: 125%; color: #fff; font-size: clamp(1.9rem, 3.9vw, 3.5rem); font-weight: 800; letter-spacing: .02em; line-height: 1.12; text-transform: none; }
+.hero h1 .accento { background: linear-gradient(90deg, #22d3ee 0%, #3b9bff 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero .lead { max-width: 35rem; margin: 1.5rem 0 2rem; font-size: 1.08rem; color: rgba(225, 235, 255, .86); }
 .hero-bottoni { display: flex; flex-wrap: wrap; gap: 1rem; }
 .hero-punti { display: flex; flex-wrap: wrap; gap: 2.2rem; list-style: none; padding: 0; margin: 3rem 0 0; color: rgba(200, 215, 245, .78); font-size: .86rem; }
