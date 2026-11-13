@@ -178,6 +178,13 @@
       el("button", { type: "button", "aria-label": "Diminuisci", onclick: function () { vai(-1); } }, "−"), span,
       el("button", { type: "button", "aria-label": "Aumenta", onclick: function () { vai(1); } }, "+"));
   }
+  // Cambia passo e lascia traccia nella cronologia: cosi' la freccia indietro del browser
+  // e il tasto indietro del mouse tornano al passo precedente.
+  function vaiPasso(n) {
+    cfg.passo = n;
+    try { history.pushState({ cfgPasso: n }, "", location.href); } catch (e) { /* senza cronologia si funziona lo stesso */ }
+    disegna();
+  }
   function aggiorna() { disegna(); }                 // ridisegna tutto (cambio di una scelta)
   function aggiornaPrezzo() { disegnaPrezzo(); }     // solo il prezzo (mentre si digita)
 
@@ -193,8 +200,8 @@
     return box;
   }
   function scegliReparto(id, saltaScroll) {
-    cfg.dati = nuoviDati(id); cfg.passo = 2; cfg.inviata = null; cfg.errori = {};
-    disegna();
+    cfg.dati = nuoviDati(id); cfg.inviata = null; cfg.errori = {};
+    vaiPasso(2);
     if (!saltaScroll) vaiA("configuratore");
   }
 
@@ -265,9 +272,9 @@
     box.appendChild(gruppoScelte("Urgenza", S.urgenze.map(function (u) { return { id: u.id, nome: u.nome, sub: u.sovrapprezzo ? "+" + Math.round(u.sovrapprezzo * 100) + "%" : "tempi normali" }; }), d.urgenza, function (v) { d.urgenza = v; aggiorna(); }));
     box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Quantità", d.quantita, "pz", function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); aggiornaPrezzo(); }, { min: 1, step: 1 })));
 
-    var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { cfg.passo = 3; disegna(); vaiA("configuratore"); } }, "Continua", el("span", { "aria-hidden": "true", text: "→" }));
+    var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { vaiPasso(3); vaiA("configuratore"); } }, "Continua", el("span", { "aria-hidden": "true", text: "→" }));
     box.appendChild(el("div", { class: "cfg-azioni" },
-      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.passo = 1; disegna(); } }, "← Cambia reparto"), avanti));
+      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { vaiPasso(1); vaiA("configuratore"); } }, "← Cambia reparto"), avanti));
     return box;
   }
 
@@ -356,7 +363,7 @@
       "Acconsento al trattamento dei dati per la richiesta di offerta (demo: i dati restano nel tuo browser). *"),
       cfg.errori.privacy ? el("span", { class: "errore-campo", role: "alert", text: cfg.errori.privacy }) : null));
     box.appendChild(el("div", { class: "cfg-azioni" },
-      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.passo = 2; disegna(); } }, "← Modifica il pezzo"),
+      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { vaiPasso(2); vaiA("configuratore"); } }, "← Modifica il pezzo"),
       el("button", { type: "button", class: "btn btn-primario", id: "btn-invia", onclick: invia }, "Invia la richiesta", el("span", { "aria-hidden": "true", text: "→" }))));
     return box;
   }
@@ -378,8 +385,8 @@
     };
     richieste.push(rec);
     scrivi("richieste", richieste);
-    cfg.inviata = rec.id; cfg.passo = 4;
-    disegna(); vaiA("configuratore");
+    cfg.inviata = rec.id;
+    vaiPasso(4); vaiA("configuratore");
   }
   function passoFatto() {
     return el("div", { class: "card cfg-box successo" },
@@ -388,7 +395,7 @@
       el("p", { text: "L'ufficio tecnico verifica il disegno e ti risponde con l'offerta ufficiale. Per vedere come la riceve e la elabora l'azienda, apri la vista Artigiancavi." }),
       el("div", { class: "hero-bottoni", style: "justify-content:center" },
         el("button", { type: "button", class: "btn btn-primario", onclick: function () { location.hash = "#/azienda/" + cfg.inviata; } }, "Vai alla vista azienda →"),
-        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.passo = 1; cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; disegna(); } }, "Nuova richiesta")));
+        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; vaiPasso(1); } }, "Nuova richiesta")));
   }
 
   /* ---------- Disegno del configuratore ---------- */
@@ -581,6 +588,7 @@
 
   function avvio() {
     applicaOverride();
+    seedRichieste(); // le richieste di esempio esistono subito, cosi' la numerazione parte da RIC-0004
     radice = document.getElementById("configuratore-app");
 
     var griglia = document.getElementById("griglia-reparti");
@@ -609,10 +617,23 @@
       });
     });
     window.addEventListener("hashchange", route);
+    // Freccia indietro / tasto indietro del mouse: si torna al passo precedente del configuratore
+    window.addEventListener("popstate", function (ev) {
+      var s = ev.state;
+      if (!s || typeof s.cfgPasso !== "number") return;
+      var n = s.cfgPasso;
+      if (n > 1 && !cfg.dati) n = 1;               // pagina ricaricata: i dati del pezzo non ci sono piu'
+      if (n === 4 && !cfg.inviata) n = 1;
+      if (n < 4) cfg.inviata = null;               // tornando indietro dopo l'invio si puo' compilare una nuova richiesta
+      cfg.passo = n;
+      disegna();
+      if (!document.getElementById("vista-pubblica").hidden) vaiA("configuratore");
+    });
 
     // Collegamento diretto per prove: ?reparto=tornitura  (apre il passo 2)
     var q = new URLSearchParams(location.search), rp = q.get("reparto");
     if (rp && reparto(rp)) { cfg.dati = nuoviDati(rp); cfg.passo = 2; }
+    try { history.replaceState({ cfgPasso: cfg.passo }, "", location.href); } catch (e) { /* ok */ }
     disegna();
     route();
   }
