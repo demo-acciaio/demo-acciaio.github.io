@@ -1,0 +1,184 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Immagini dei reparti (solo strumento di lavoro)</title>
+<style>html,body{margin:0;background:#0b1530}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"../js/vendor/three.module.min.js"}}</script>
+<canvas id="c" width="800" height="600"></canvas>
+<script type="module">
+/* Crea le quattro immagini dei reparti (img/reparto-*.png) come "foto" di pezzi 3D.
+   Uso: server locale nella cartella del progetto, poi node strumenti/genera_reparti.js <cartella-profilo>.
+   Poi convertire in WebP (Pillow) e tenere solo i .webp. */
+import * as THREE from "three";
+import { RoomEnvironment } from "../js/vendor/RoomEnvironment.js";
+
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const ENV = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+/* ---------- materiali ---------- */
+const metallo = (colore, rough = 0.3, env = 1.25, metal = 0.9) => new THREE.MeshStandardMaterial({ color: colore, metalness: metal, roughness: rough, envMapIntensity: env });
+const ACCIAIO = () => metallo(0xcfd8e6, 0.28);
+const ACCIAIO_SCURO = () => metallo(0x8d97a8, 0.32);
+const ALLUMINIO = () => metallo(0xe3e8f0, 0.42, 1.3, 0.8);
+const OTTONE = () => metallo(0xdcb064, 0.28, 1.4);
+const BRONZO = () => metallo(0xc98a4b, 0.3, 1.4);
+const WIDIA = () => metallo(0x555d6b, 0.28);
+
+/* ---------- forme di base ---------- */
+function cil(r, h, mat, seg = 64) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat); return m; }
+function tronco(rSopra, rSotto, h, mat, seg = 64) { return new THREE.Mesh(new THREE.CylinderGeometry(rSopra, rSotto, h, seg), mat); }
+function elica(r, passo, giri, tubo, mat) {
+  class E extends THREE.Curve { getPoint(t, o = new THREE.Vector3()) { const a = t * giri * Math.PI * 2; return o.set(r * Math.cos(a), t * giri * passo, r * Math.sin(a)); } }
+  return new THREE.Mesh(new THREE.TubeGeometry(new E(), Math.round(giri * 48), tubo, 10, false), mat);
+}
+function rettArrotondato(w, h, r) {
+  const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  return s;
+}
+function percorsoRett(w, h, r) { const p = new THREE.Path(), x = -w / 2, y = -h / 2;
+  p.moveTo(x + r, y); p.lineTo(x + w - r, y); p.quadraticCurveTo(x + w, y, x + w, y + r);
+  p.lineTo(x + w, y + h - r); p.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  p.lineTo(x + r, y + h); p.quadraticCurveTo(x, y + h, x, y + h - r); p.lineTo(x, y + r); p.quadraticCurveTo(x, y, x + r, y); return p; }
+function foro(x, y, r) { const p = new THREE.Path(); p.absarc(x, y, r, 0, Math.PI * 2, true); return p; }
+// Estrusione lungo Y (la forma sta nel piano XZ), con smusso
+function estrudi(shape, altezza, mat, smusso = 0.6) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: altezza - 2 * smusso, bevelEnabled: true, bevelThickness: smusso, bevelSize: smusso, bevelSegments: 3, curveSegments: 40 });
+  g.rotateX(-Math.PI / 2); g.translate(0, smusso, 0);
+  return new THREE.Mesh(g, mat);
+}
+function esagono(r) { const s = new THREE.Shape(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; const x = r * Math.cos(a), y = r * Math.sin(a); i ? s.lineTo(x, y) : s.moveTo(x, y); } s.closePath(); return s; }
+function anello(rE, rI, altezza, mat, smusso = 0.4) { const s = new THREE.Shape(); s.absarc(0, 0, rE, 0, Math.PI * 2, false); s.holes.push(foro(0, 0, rI)); return estrudi(s, altezza, mat, smusso); }
+
+/* ---------- 1. TORNITURA: albero con gola e filetto + boccola in bronzo ---------- */
+function scenaTornitura() {
+  const g = new THREE.Group(); const alb = new THREE.Group(); g.add(alb);
+  const sezioni = [ // [raggio, da y, a y]
+    [16, 0, 16], [10, 18, 50], [8, 50, 55], [10, 55, 68]];
+  sezioni.forEach(([r, a, b]) => { const m = cil(r, b - a, ACCIAIO()); m.position.y = (a + b) / 2; alb.add(m); });
+  const smCollare = tronco(14, 16, 2, ACCIAIO()); smCollare.position.y = 17; alb.add(smCollare);
+  const nucleo = cil(7.1, 32, ACCIAIO()); nucleo.position.y = 84; alb.add(nucleo);
+  const fil = elica(7.5, 2.4, 13.2, 0.95, ACCIAIO()); fil.position.y = 68.5; alb.add(fil);
+  const punta = tronco(5.6, 7.1, 2.4, ACCIAIO()); punta.position.y = 101.2; alb.add(punta);
+  // anelli di finitura sul collare
+  [4, 9, 13].forEach((y) => { const a = tronco(16.15, 16.15, 0.35, ACCIAIO_SCURO()); a.position.y = y; alb.add(a); });
+  alb.position.set(0, -50, 0);
+  const b = anello(14, 8.2, 22, BRONZO(), 0.9); b.position.set(34, -50, 18); g.add(b);
+  const b2 = anello(14, 8.2, 22, BRONZO(), 0.9); b2.position.set(-4, -50, 34); g.add(b2);
+  g.rotation.set(0.0, 0, 0);
+  return { g, vista: new THREE.Euler(0.55, -0.55, 1.12, "ZXY"), fit: 1.0 };
+}
+
+/* ---------- 2. FRESATURA: piastra in alluminio con tasca, isola e fori + fresa ---------- */
+function scenaFresatura() {
+  const g = new THREE.Group();
+  const W = 86, D = 62, R = 7;
+  const sFrame = rettArrotondato(W, D, R); sFrame.holes.push(percorsoRett(60, 38, 7));
+  [[-36, -24], [36, -24], [-36, 24], [36, 24]].forEach(([x, y]) => sFrame.holes.push(foro(x, y, 3.4)));
+  const sBase = rettArrotondato(W, D, R);
+  [[-36, -24], [36, -24], [-36, 24], [36, 24]].forEach(([x, y]) => sBase.holes.push(foro(x, y, 3.4)));
+  const base = estrudi(sBase, 5, ALLUMINIO(), 0.5);
+  const frame = estrudi(sFrame, 16, ALLUMINIO(), 0.8); frame.position.y = 4.4;
+  g.add(base, frame);
+  // isole nella tasca: due colonne forate e una nervatura
+  const isola = (x, z) => { const s = new THREE.Shape(); s.absarc(0, 0, 7.5, 0, Math.PI * 2, false); s.holes.push(foro(0, 0, 3)); const m = estrudi(s, 15, ALLUMINIO(), 0.6); m.position.set(x, 4.4, z); return m; };
+  g.add(isola(-14, 0), isola(14, 0));
+  const nerv = estrudi(rettArrotondato(10, 26, 3), 9, ALLUMINIO(), 0.5); nerv.position.set(0, 4.4, 0); g.add(nerv);
+  g.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.rotateY(0); });
+  // fresa a candela appoggiata di fianco
+  const fr = new THREE.Group();
+  const gambo = cil(3.6, 34, WIDIA()); gambo.position.y = 17; fr.add(gambo);
+  const lama = cil(3.6, 26, WIDIA()); lama.position.y = 47; fr.add(lama);
+  for (let k = 0; k < 4; k++) { const e = elica(3.45, 22, 1.2, 0.55, metallo(0xaeb7c6, 0.2)); e.rotation.y = k * Math.PI / 2; e.position.y = 36; fr.add(e); }
+  const pt = tronco(2.6, 3.6, 2.2, WIDIA()); pt.position.y = 61; fr.add(pt);
+  fr.rotation.z = Math.PI / 2; fr.position.set(-50, 4, 46); fr.rotation.y = 0.35; fr.position.x = 8; fr.position.z = 52;
+  fr.rotation.set(0, 0, Math.PI / 2); fr.rotation.order = "YXZ"; fr.rotation.y = -0.18;
+  g.add(fr);
+  return { g, vista: new THREE.Euler(0.62, 0.55, 0, "XYZ"), fit: 1.0 };
+}
+
+/* ---------- 3. CAVI: fune d'acciaio a trefoli con occhiello e terminale filettato ---------- */
+function scenaCavi() {
+  const g = new THREE.Group();
+  const pts = [[-54, -16, 0], [-34, -16, 0], [-14, 6, 8], [6, 16, -2], [26, -2, -4], [44, -4, 4], [58, 14, 0]].map((p) => new THREE.Vector3(...p));
+  const centro = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
+  const N = 360, fr = centro.computeFrenetFrames(N, false);
+  const R = 3.3, s = R / 3, off = R - s, passo = 15;
+  const mat = metallo(0xb7c0cf, 0.34, 1.2);
+  const tubo = (punti, r) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(punti, false, "catmullrom", 0.5), N, r, 8, false), mat);
+  const lung = centro.getLength();
+  const nucleo = []; for (let i = 0; i <= N; i++) nucleo.push(centro.getPointAt(i / N));
+  g.add(tubo(nucleo, s * 0.95));
+  for (let k = 0; k < 6; k++) {
+    const p = [];
+    for (let i = 0; i <= N; i++) { const t = i / N; const th = k * Math.PI / 3 + (t * lung / passo) * Math.PI * 2; const c = centro.getPointAt(t);
+      p.push(c.clone().addScaledVector(fr.normals[i], Math.cos(th) * off).addScaledVector(fr.binormals[i], Math.sin(th) * off)); }
+    g.add(tubo(p, s));
+  }
+  const orienta = (m, dir) => m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  // terminale filettato (inizio): l'asse locale +y punta verso l'esterno, la boccola copre la fine della fune
+  const t0 = centro.getTangentAt(0), p0 = centro.getPointAt(0);
+  const gr = new THREE.Group();
+  const ferr0 = cil(4.6, 14, OTTONE()); ferr0.position.y = -7; gr.add(ferr0);
+  const sp0 = tronco(3.6, 4.6, 2, OTTONE()); sp0.position.y = 1; gr.add(sp0);
+  const stelo = cil(3.1, 20, ACCIAIO()); stelo.position.y = 11; gr.add(stelo);
+  const f0 = elica(3.4, 1.6, 11, 0.5, ACCIAIO()); f0.position.y = 2.5; gr.add(f0);
+  orienta(gr, t0.clone().negate()); gr.position.copy(p0); g.add(gr);
+  // occhiello (fine)
+  const t1 = centro.getTangentAt(1), p1 = centro.getPointAt(1);
+  const ge = new THREE.Group();
+  const ferr1 = cil(4.8, 14, OTTONE()); ferr1.position.y = -7; ge.add(ferr1);
+  const col = tronco(3.6, 4.8, 2, OTTONE()); col.position.y = 1; ge.add(col);
+  const anelloOcc = new THREE.Mesh(new THREE.TorusGeometry(8, 2.5, 20, 64), OTTONE()); anelloOcc.position.y = 12.5; ge.add(anelloOcc);
+  orienta(ge, t1); ge.position.copy(p1); g.add(ge);
+  return { g, vista: new THREE.Euler(0.35, -0.35, 0.08, "XYZ"), fit: 1.0 };
+}
+
+/* ---------- 4. ASSEMBLAGGI: bullone, piastra, rondella e dado in vista esplosa ---------- */
+function scenaAssemblaggi() {
+  const g = new THREE.Group();
+  const testa = estrudi(esagono(9.5), 7, ACCIAIO(), 0.8); testa.position.y = 74; g.add(testa);
+  const gambo = cil(4.1, 44, ACCIAIO()); gambo.position.y = 52; g.add(gambo);
+  const fil = elica(4.3, 1.8, 14, 0.55, ACCIAIO()); fil.position.y = 30; g.add(fil);
+  const punta = tronco(3.2, 4.1, 1.6, ACCIAIO()); punta.position.y = 29.2; g.add(punta);
+  const sP = rettArrotondato(46, 30, 5); sP.holes.push(foro(0, 0, 4.6), foro(-17, 0, 2.6), foro(17, 0, 2.6));
+  const piastra = estrudi(sP, 5, ALLUMINIO(), 0.5); piastra.position.y = 44; g.add(piastra);
+  const r1 = anello(8.6, 4.5, 1.8, ACCIAIO_SCURO(), 0.3); r1.position.y = 60; g.add(r1);
+  const r2 = anello(8.6, 4.5, 1.8, ACCIAIO_SCURO(), 0.3); r2.position.y = 30; g.add(r2);
+  const sD = esagono(9.5); sD.holes.push(foro(0, 0, 4));
+  const dado = estrudi(sD, 7.5, ACCIAIO(), 0.8); dado.position.y = 16; g.add(dado);
+  g.position.y = -40;
+  return { g, vista: new THREE.Euler(0.55, 0.5, 0.55, "ZXY"), fit: 1.0 };
+}
+
+const SCENE = { tornitura: scenaTornitura, fresatura: scenaFresatura, cavi: scenaCavi, assemblaggi: scenaAssemblaggi };
+
+function scatta(nome, w, h) {
+  const { g, vista, fit } = SCENE[nome]();
+  const scena = new THREE.Scene(); scena.environment = ENV; scena.environmentIntensity = 1.5;
+  const perno = new THREE.Group(); perno.add(g); scena.add(perno);
+  perno.rotation.copy(vista); perno.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(perno); const c = box.getCenter(new THREE.Vector3()); perno.position.sub(c);
+  perno.updateMatrixWorld(true);
+  const sfera = new THREE.Box3().setFromObject(perno).getBoundingSphere(new THREE.Sphere());
+  const cam = new THREE.PerspectiveCamera(26, w / h, 1, 3000);
+  const fovV = THREE.MathUtils.degToRad(cam.fov), fovO = 2 * Math.atan(Math.tan(fovV / 2) * cam.aspect);
+  const dist = (sfera.radius / Math.sin(Math.min(fovV, fovO) / 2)) * 0.72 * fit;
+  cam.position.set(sfera.center.x, sfera.center.y, sfera.center.z + dist); cam.lookAt(sfera.center);
+  const chiave = new THREE.DirectionalLight(0xffffff, 1.5); chiave.position.set(1.2, 1.5, 1.7); scena.add(chiave);
+  const bordo = new THREE.DirectionalLight(0x22d3ee, 2.0); bordo.position.set(-1.6, 0.6, -1.2); scena.add(bordo);
+  scena.add(new THREE.HemisphereLight(0xb9ccf5, 0x3a4a70, 0.9));
+  const riempi = new THREE.DirectionalLight(0xc9d8ff, 0.9); riempi.position.set(-1.2, -0.3, 1.4); scena.add(riempi);
+  renderer.setPixelRatio(1); renderer.setSize(w, h, false);
+  renderer.render(scena, cam);
+  return canvas.toDataURL("image/png");
+}
+window.RENDER = { scatta, nomi: Object.keys(SCENE), pronto: true };
+</script>

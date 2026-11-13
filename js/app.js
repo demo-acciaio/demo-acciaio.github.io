@@ -480,7 +480,7 @@
     var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p1.titolo") }));
     var griglia = el("div", { class: "reparto-scelta" });
     REPARTI.forEach(function (r) {
-      var ic = el("span", { class: "rc-icona" }); ic.innerHTML = ICONE[r]; // disegni fissi
+      var ic = fotoReparto(r, "rc-foto");
       griglia.appendChild(el("button", { type: "button", class: "reparto-card", onclick: function () { scegliReparto(r); } },
         ic, el("span", { class: "rc-testo" }, el("span", { class: "rc-nome", text: repNome(r) }), el("span", { class: "rc-desc", text: t("rep." + r + ".desc") })),
         el("span", { class: "rc-freccia", "aria-hidden": "true", text: "→" })));
@@ -1023,22 +1023,17 @@
       });
     });
   }
-  // Icone a linea dei quattro reparti (disegni fissi, nessun testo)
-  var ICONE = {
-    tornitura: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M1 24h46" stroke-dasharray="4 3" opacity=".45"/><rect x="3" y="10" width="9" height="28" rx="2"/><path d="M12 15h3v4h-3M12 29h3v4h-3"/><path d="M15 17h12v-3h14v20H27v-3H15z"/><path d="M27 14v20" opacity=".5"/><path d="M30 2h12v6H30z"/><path d="M33 8l3 6 3-6"/></svg>',
-    fresatura: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 2h12v7H18z"/><path d="M20 9h8l-1 4h-6z"/><path d="M20.5 13h7v17h-7z"/><path d="M20.5 17l7 3.5M20.5 23l7 3.5" opacity=".7"/><path d="M20.5 30l1.5 4h4l1.5-4"/><path d="M5 44V33h13v5h12v-5h13v11z"/><path d="M11 12a10 4 0 0 1 4-2.5M37 12a10 4 0 0 0-4-2.5" opacity=".6"/></svg>',
-    cavi: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10.5 29C18 29 17 17 25 17S33 25 37 25"/><path d="M10.5 35C18 35 17 23 25 23S33 31 37 31"/><path d="M10 32C18 32 17 20 25 20S33 28 37 28" stroke-dasharray="2.5 2.5" opacity=".5"/><circle cx="6" cy="32" r="4.5"/><circle cx="6" cy="32" r="1.6"/><rect x="37" y="23" width="6" height="9" rx="1"/><path d="M43 27.5h4M45 25.5v4"/></svg>',
-    assemblaggi: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 1v46" stroke-dasharray="3 3" opacity=".45"/><path d="M15 4h18v7H15z"/><path d="M21 4v7M27 4v7" opacity=".6"/><path d="M20 11v19h8V11"/><path d="M20 15h8M20 19h8M20 23h8M20 27h8" opacity=".55"/><path d="M15 37h18v7H15z"/><path d="M21 37v7M27 37v7" opacity=".6"/><path d="M24 31.5v3" opacity="0"/></svg>'
-  };
+  // Immagini 3D dei quattro reparti (img/reparto-*.webp, create con strumenti/genera_reparti.js)
+  function fotoReparto(r, classe) {
+    return el("img", { class: classe, src: "img/reparto-" + r + ".webp", alt: "", width: 640, height: 480, loading: "lazy", decoding: "async" });
+  }
   var tilesViste = false;
   function costruisciTile() {
     var griglia = document.getElementById("griglia-reparti");
     svuota(griglia);
     REPARTI.forEach(function (r, i) {
-      var icona = el("span", { class: "rt-icona" });
-      icona.innerHTML = ICONE[r]; // disegni fissi definiti qui sopra, non dati dell'utente
       var tile = el("button", { type: "button", class: "reparto-tile rivela" + (tilesViste ? " visto subito" : ""), style: "--ritardo:" + (i * 0.09) + "s", onclick: function () { scegliReparto(r); } },
-        el("div", { class: "rt-testa" }, el("span", { class: "rt-num", text: "0" + (i + 1) }), icona),
+        el("div", { class: "rt-testa" }, el("span", { class: "rt-num", text: "0" + (i + 1) }), fotoReparto(r, "rt-foto")),
         el("div", { class: "rt-testo" }, el("h3", { text: repNome(r) }), el("p", { text: t("rep." + r + ".desc") })),
         el("span", { class: "vai", text: t("vai.configura") }));
       griglia.appendChild(tile);
