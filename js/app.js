@@ -1081,8 +1081,33 @@
     }
     daVedere.forEach(function (e) { osservatore.observe(e); });
   }
+  // Barra dei materiali: ripete le parole quanto serve per coprire QUALSIASI larghezza (mai spazio vuoto) e tiene la stessa velocita'
+  var marqueeTimer = 0;
+  function riempiMarquee() {
+    var pista = document.querySelector(".marquee-pista");
+    if (!pista) return;
+    var liste = pista.querySelectorAll(".marquee-lista");
+    if (liste.length < 2) return;
+    var serie = Array.prototype.slice.call(liste[0].querySelectorAll("span[data-i18n]")).slice(0, 6); // una sola serie, nella lingua corrente
+    if (!serie.length) return;
+    var riempi = function (lista, n) {
+      svuota(lista);
+      for (var i = 0; i < n; i++) serie.forEach(function (s) { lista.appendChild(s.cloneNode(true)); });
+    };
+    var copia = serie.map(function (s) { return s.cloneNode(true); });
+    serie = copia;
+    riempi(liste[0], 1); riempi(liste[1], 1);
+    var w1 = liste[0].getBoundingClientRect().width;
+    if (!w1) return;
+    var n = Math.max(1, Math.ceil(window.innerWidth / w1)); // una serie deve coprire almeno tutto lo schermo
+    riempi(liste[0], n); riempi(liste[1], n);
+    pista.style.animationDuration = Math.max(12, Math.round((w1 * n) / 55)) + "s"; // circa 55 px al secondo su ogni schermo
+  }
+  function programmaMarquee() { clearTimeout(marqueeTimer); marqueeTimer = setTimeout(riempiMarquee, 120); }
+
   // Aggiorna tutto cio' che dipende dalla lingua, senza perdere cio' che l'utente ha inserito
   function aggiornaLingua() {
+    riempiMarquee();
     creaLingue();
     costruisciTile();
     var slot = document.getElementById("azzera-slot"); svuota(slot); slot.appendChild(bottoneAzzera("link-piede"));
@@ -1143,6 +1168,10 @@
     try { history.replaceState({ cfgPasso: cfg.passo }, "", location.href); } catch (e) { /* ok */ }
     disegna();
     route();
+    riempiMarquee();
+    window.addEventListener("resize", programmaMarquee);
+    window.addEventListener("load", riempiMarquee);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(riempiMarquee);
   }
   // Prima disegnata: stesso lavoro di aggiornaLingua ma senza toccare cio' che non esiste ancora
   function aggiornaLinguaIniziale() {

@@ -107,7 +107,7 @@ function scenaFresatura() {
 /* ---------- 3. CAVI: fune d'acciaio a trefoli con occhiello e terminale filettato ---------- */
 function scenaCavi() {
   const g = new THREE.Group();
-  const pts = [[-54, -16, 0], [-34, -16, 0], [-14, 6, 8], [6, 16, -2], [26, -2, -4], [44, -4, 4], [58, 14, 0]].map((p) => new THREE.Vector3(...p));
+  const pts = [[-62, -16, 0], [-48, -16, 0], [-34, -16, 0], [-20, -16, 0], [-6, 2, 8], [10, 14, 0], [26, 2, -4], [34, -3, 0], [46, 3, 0], [58, 9, 0], [70, 15, 0]].map((p) => new THREE.Vector3(...p));
   const centro = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
   const N = 360, fr = centro.computeFrenetFrames(N, false);
   const R = 3.3, s = R / 3, off = R - s, passo = 15;
@@ -138,7 +138,7 @@ function scenaCavi() {
   const col = tronco(3.6, 4.8, 2, OTTONE()); col.position.y = 1; ge.add(col);
   const anelloOcc = new THREE.Mesh(new THREE.TorusGeometry(8, 2.5, 20, 64), OTTONE()); anelloOcc.position.y = 12.5; ge.add(anelloOcc);
   orienta(ge, t1); ge.position.copy(p1); g.add(ge);
-  return { g, vista: new THREE.Euler(0.35, -0.35, 0.08, "XYZ"), fit: 1.0 };
+  return { g, vista: new THREE.Euler(0.35, -0.35, 0.08, "XYZ"), fit: 1.14 };
 }
 
 /* ---------- 4. ASSEMBLAGGI: bullone, piastra, rondella e dado in vista esplosa ---------- */
