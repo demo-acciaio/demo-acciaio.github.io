@@ -1,0 +1,4 @@
+# I PDF e i file STEP non vanno mai convertiti (CRLF) da Git
+*.pdf binary
+*.step -text
+*.svg text eol=lf
