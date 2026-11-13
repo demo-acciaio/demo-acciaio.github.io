@@ -488,7 +488,7 @@
     var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p1.titolo") }));
     var griglia = el("div", { class: "reparto-scelta" });
     REPARTI.forEach(function (r) {
-      var ic = el("span", { class: "rc-foto-box" }, fotoReparto(r, "rc-foto")); // miniatura ingrandita: si vede il pezzo, non la cornice
+      var ic = el("span", { class: "rc-foto-box" }, fotoReparto(r, "rc-foto", true)); // miniatura ritagliata sul solo pezzo, senza cornice
       griglia.appendChild(el("button", { type: "button", class: "reparto-card", onclick: function () { scegliReparto(r); } },
         ic, el("span", { class: "rc-testo" }, el("span", { class: "rc-nome", text: repNome(r) }), el("span", { class: "rc-desc", text: t("rep." + r + ".desc") })),
         el("span", { class: "rc-freccia", "aria-hidden": "true", text: "→" })));
@@ -1051,10 +1051,10 @@
     });
   }
   // Immagini 3D dei quattro reparti (img/reparto-*.webp, creati da Massimo con un generatore di immagini e normalizzati: stesso esagono, quadrati 640x640)
-  function fotoReparto(r, classe) {
-    return el("img", { class: classe, src: "img/reparto-" + r + ".webp", alt: "", width: 640, height: 640, loading: "lazy", decoding: "async" });
-  }
-  var tilesViste = false;
+  function fotoReparto(r, classe, miniatura) {
+    var lato = miniatura ? 320 : 640;
+    return el("img", { class: classe, src: "img/" + (miniatura ? "mini-" : "reparto-") + r + ".webp", alt: "", width: lato, height: lato, loading: "lazy", decoding: "async" });
+  }  var tilesViste = false;
   function costruisciTile() {
     var griglia = document.getElementById("griglia-reparti");
     svuota(griglia);
