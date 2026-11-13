@@ -58,6 +58,8 @@ input, textarea { font: inherit; color: inherit; }
 html[data-theme="dark"] .logo-chiaro { display: none; }
 html[data-theme="dark"] .logo-scuro { display: block; }
 .icona.solo-mobile { display: none; }
+.menu .voce-azienda { display: none; }
+.dal-file { margin-left: .5rem; vertical-align: middle; }
 
 /* Bottoni */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 48px; padding: .75rem 1.4rem; border-radius: 6px; border: 2px solid transparent; font-weight: 700; font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; background: transparent; transition: background .15s, border-color .15s, transform .05s; }
@@ -271,6 +273,7 @@ html[data-theme="dark"] .logo-scuro { display: block; }
   .top { padding: 0 16px; gap: .5rem; }
   .logo img { height: 30px; }
   #btn-vista-azienda { display: none; }
+  .menu .voce-azienda { display: block; margin-top: .9rem; padding: .9rem 1rem; text-align: center; font-weight: 800; color: #fff; background: var(--blu); border: 0; border-radius: 6px; }
   .hero-testo { padding: 2.5rem 0 3rem; }
   .hero .lead { font-size: 1rem; }
   .hero-bottoni .btn { width: 100%; }

@@ -149,8 +149,14 @@
   var pannelloPrezzo = null;
 
   /* ---------- Componenti del modulo ---------- */
-  function gruppoScelte(etichetta, voci, valore, alScelta, aiuto) {
-    var box = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: etichetta }));
+  // Bollino "dal file" sui campi compilati dalla lettura di STEP/PDF; sparisce quando l'utente cambia il valore a mano
+  function badgeFile(chiave) {
+    return chiave && cfg.file && cfg.file.compilati && cfg.file.compilati[chiave] ? el("span", { class: "badge badge-blu dal-file", text: "dal file" }) : null;
+  }
+  function togliDalFile(chiave) { if (cfg.file && cfg.file.compilati) delete cfg.file.compilati[chiave]; }
+
+  function gruppoScelte(etichetta, voci, valore, alScelta, aiuto, chiave) {
+    var box = el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta" }, etichetta, badgeFile(chiave)));
     var scelte = el("div", { class: "scelte", role: "group", "aria-label": etichetta });
     voci.forEach(function (v) {
       scelte.appendChild(el("button", {
@@ -168,7 +174,7 @@
     var id = "f" + Math.random().toString(36).slice(2, 8);
     var input = el("input", { class: "input", id: id, type: "number", inputmode: "decimal", min: opz.min || 0, step: opz.step || "any", value: valore });
     input.addEventListener("input", function () { alCambio(parseFloat(input.value.replace(",", "."))); });
-    return el("div", { class: "campo" }, el("label", { for: id, text: etichetta }),
+    return el("div", { class: "campo" }, el("label", { for: id }, etichetta, badgeFile(opz.chiave)),
       el("div", { class: "input-unita" }, input, unita ? el("span", { class: "unita", text: unita }) : null));
   }
   function contatore(valore, min, max, alCambio) {
@@ -228,7 +234,7 @@
     });
   }
   function modificaMisura(d, chiave, valore) {
-    d.geometria[chiave] = valore;
+    d.geometria[chiave] = valore; togliDalFile("misure");
     if (d.geometria.volumeFinito) { delete d.geometria.volumeFinito; if (cfg.file) cfg.file.volumeIgnorato = true; }
   }
 
@@ -266,7 +272,7 @@
     });
     Promise.all(compiti).then(function (ris) {
       if (token !== cfg.tokenFile) return; // nel frattempo e' stato scelto un altro file
-      var f = { esempio: esempioId, errori: [], avvisi: [] };
+      var f = { esempio: esempioId, errori: [], avvisi: [], compilati: {} };
       ris.forEach(function (x) {
         if (x.errore) { f.errori.push(x.errore); return; }
         if (x.tipo === "step") applicaStep(f, x, d);
@@ -291,6 +297,7 @@
     } else {
       d.geometria = { x: m.x, y: m.y, z: m.z, volumeFinito: r.volumeCm3 };
     }
+    f.compilati.misure = true;
     if (r.corpi > 1) f.avvisi.push("Il file contiene " + r.corpi + " corpi: il volume è la somma di tutti.");
     f.step = { nome: x.nome, ingombro: r.ingombro, volume: r.volumeCm3, meshes: r.meshes };
   }
@@ -300,13 +307,13 @@
     if (!r.haTesto) { f.avvisi.push("Il PDF non contiene testo leggibile (forse è una scansione): mostro solo l'anteprima, compila i dati a mano."); return; }
     if (!r.trovati.length) { f.avvisi.push("Nel PDF non ho trovato un cartiglio riconoscibile (materiale, quantità, tolleranze): compila i dati a mano."); return; }
     if (d.reparto !== "tornitura" && d.reparto !== "fresatura") return;
-    if (c.materiale && trova(S.materiali, c.materiale)) d.materiale = c.materiale;
-    if (c.tolleranza) d.tolleranza = c.tolleranza;
-    if (c.quantita) d.quantita = c.quantita;
+    if (c.materiale && trova(S.materiali, c.materiale)) { d.materiale = c.materiale; f.compilati.materiale = true; }
+    if (c.tolleranza) { d.tolleranza = c.tolleranza; f.compilati.tolleranza = true; }
+    if (c.quantita) { d.quantita = c.quantita; f.compilati.quantita = true; }
     if (c.finitura) {
       var fin = trova(S.finiture, c.finitura), mat = trova(S.materiali, d.materiale);
       if (fin.gruppi && fin.gruppi.indexOf(mat.gruppo) < 0) f.avvisi.push("Il disegno indica «" + fin.nome + "», che non è adatta a questo materiale: non è stata applicata.");
-      else d.finitura = c.finitura;
+      else { d.finitura = c.finitura; f.compilati.finitura = true; }
     }
   }
 
@@ -409,11 +416,11 @@
         function (v) { d.macchina = v; aggiorna(); },
         rep === "tornitura" ? "Il tornio con asse Y serve se ci sono fresature o fori fuori asse." : "Più assi significa meno riprese, ma una tariffa oraria più alta."));
       box.appendChild(gruppoScelte("Materiale", materialiCompatibili(), d.materiale, function (v) {
-        d.materiale = v;
+        d.materiale = v; togliDalFile("materiale");
         var f = trova(S.finiture, d.finitura), m = trova(S.materiali, v);
-        if (f.gruppi && f.gruppi.indexOf(m.gruppo) < 0) d.finitura = "nessuna";
+        if (f.gruppi && f.gruppi.indexOf(m.gruppo) < 0) { d.finitura = "nessuna"; togliDalFile("finitura"); }
         aggiorna();
-      }));
+      }, null, "materiale"));
       var misure = el("div", { class: "cfg-griglia" });
       if (rep === "tornitura") {
         misure.appendChild(campoNumero("Diametro", d.geometria.diametro, "mm", function (v) { modificaMisura(d, "diametro", v); aggiornaPrezzo(); }));
@@ -423,14 +430,14 @@
         misure.appendChild(campoNumero("Larghezza Y", d.geometria.y, "mm", function (v) { modificaMisura(d, "y", v); aggiornaPrezzo(); }));
         misure.appendChild(campoNumero("Altezza Z", d.geometria.z, "mm", function (v) { modificaMisura(d, "z", v); aggiornaPrezzo(); }));
       }
-      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta", text: "Misure del pezzo finito (ingombro)" }), misure));
+      box.appendChild(el("div", { class: "cfg-gruppo" }, el("span", { class: "etichetta" }, "Misure del pezzo finito (ingombro)", badgeFile("misure")), misure));
       box.appendChild(gruppoScelte("Complessità", S.complessita, d.complessita, function (v) { d.complessita = v; aggiorna(); }));
-      box.appendChild(gruppoScelte("Tolleranze", S.tolleranze, d.tolleranza, function (v) { d.tolleranza = v; aggiorna(); }));
+      box.appendChild(gruppoScelte("Tolleranze", S.tolleranze, d.tolleranza, function (v) { d.tolleranza = v; togliDalFile("tolleranza"); aggiorna(); }, null, "tolleranza"));
       var mat = trova(S.materiali, d.materiale);
       box.appendChild(gruppoScelte("Finitura o trattamento", S.finiture.map(function (f) {
         var no = f.gruppi && f.gruppi.indexOf(mat.gruppo) < 0;
         return { id: f.id, nome: f.nome, disabilitata: no ? "Non adatta a questo materiale" : null };
-      }), d.finitura, function (v) { d.finitura = v; aggiorna(); }));
+      }), d.finitura, function (v) { d.finitura = v; togliDalFile("finitura"); aggiorna(); }, null, "finitura"));
     }
 
     if (rep === "cavi") {
@@ -460,7 +467,7 @@
 
     box.appendChild(gruppoScelte("Collaudo", S.collaudi, d.collaudo, function (v) { d.collaudo = v; aggiorna(); }));
     box.appendChild(gruppoScelte("Urgenza", S.urgenze.map(function (u) { return { id: u.id, nome: u.nome, sub: u.sovrapprezzo ? "+" + Math.round(u.sovrapprezzo * 100) + "%" : "tempi normali" }; }), d.urgenza, function (v) { d.urgenza = v; aggiorna(); }));
-    box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Quantità", d.quantita, "pz", function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); aggiornaPrezzo(); }, { min: 1, step: 1 })));
+    box.appendChild(el("div", { class: "cfg-gruppo" }, campoNumero("Quantità", d.quantita, "pz", function (v) { d.quantita = Math.max(1, Math.floor(v) || 1); togliDalFile("quantita"); aggiornaPrezzo(); }, { min: 1, step: 1, chiave: "quantita" })));
 
     var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { vaiPasso(3); vaiA("configuratore"); } }, "Continua", el("span", { "aria-hidden": "true", text: "→" }));
     box.appendChild(el("div", { class: "cfg-azioni" },
@@ -836,6 +843,9 @@
     document.getElementById("vista-pubblica").hidden = inAzienda;
     document.getElementById("vista-azienda").hidden = !inAzienda;
     document.getElementById("btn-vista-azienda").textContent = inAzienda ? "Torna al sito" : "Vista azienda";
+    var vm = document.getElementById("menu-azienda");   // la stessa voce dentro il menu del telefono
+    vm.textContent = inAzienda ? "Torna al sito" : "Vista azienda";
+    vm.setAttribute("href", inAzienda ? "#/" : "#/azienda");
     if (inAzienda) {
       var m = h.match(/^#\/azienda\/(RIC-\d+)/); if (m) { az.sel = m[1]; az.tab = "richieste"; }
       disegnaAzienda(); window.scrollTo(0, 0);
