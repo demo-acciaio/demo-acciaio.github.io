@@ -491,9 +491,10 @@ html[data-theme="dark"] .anteprima-pdf { filter: brightness(.92); }
 /* Passo 1: riquadri dei reparti con icona */
 .reparto-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.1rem; padding: 1.25rem 1.3rem; text-align: left; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(165deg, color-mix(in srgb, var(--card) 90%, var(--blu)) 0%, var(--card) 70%); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
 .reparto-card:hover { transform: translateY(-3px); border-color: var(--acc); box-shadow: var(--glow); }
-.rc-foto-box { display: block; flex: none; width: 7rem; height: 7rem; overflow: hidden; border-radius: 12px; background: #030816; }
-.rc-foto { display: block; width: 100%; height: 100%; object-fit: cover; }
-/* miniatura: solo il pezzo su fondo scuro con bordi sfumati, senza cornice (uguale nei due temi) */
+.rc-foto-box { display: block; flex: none; width: 8rem; height: 8rem; }
+.rc-foto { display: block; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+/* schizzo a matita: tema chiaro = linee scure su sfondo trasparente; tema scuro = linee chiare (colori invertiti), il fondo sparisce */
+html[data-theme="dark"] .rc-foto { filter: invert(1) brightness(1.15); mix-blend-mode: screen; }
 .rc-nome { display: block; font-weight: 800; font-size: 1.05rem; color: var(--titolo); }
 .rc-desc { display: block; margin-top: .25rem; font-size: .82rem; font-weight: 500; color: var(--muted); }
 .rc-freccia { font-family: var(--mono); font-size: 1.3rem; color: var(--acc); transition: transform .2s ease; }
@@ -578,7 +579,7 @@ html[data-theme="dark"] .prezzo-grande { background: linear-gradient(180deg, #ff
   .cfg-passo + .cfg-passo::before { left: -1.1rem; width: 1.1rem; }
   .reparto-card { grid-template-columns: auto minmax(0, 1fr); padding: 1.1rem; }
   .rc-freccia { display: none; }
-  .rc-foto-box { width: 5rem; height: 5rem; }
+  .rc-foto-box { width: 5.5rem; height: 5.5rem; }
   .kpi { gap: .7rem; }
   .kpi-tessera { padding: .9rem 1rem; }
   .pipeline { gap: .4rem; }
