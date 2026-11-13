@@ -1050,9 +1050,9 @@
       });
     });
   }
-  // Immagini 3D dei quattro reparti (img/reparto-*.webp, create con strumenti/genera_reparti.js)
+  // Immagini 3D dei quattro reparti (img/reparto-*.webp, creati da Massimo con un generatore di immagini e normalizzati: stesso esagono, quadrati 640x640)
   function fotoReparto(r, classe) {
-    return el("img", { class: classe, src: "img/reparto-" + r + ".webp", alt: "", width: 640, height: 480, loading: "lazy", decoding: "async" });
+    return el("img", { class: classe, src: "img/reparto-" + r + ".webp", alt: "", width: 640, height: 640, loading: "lazy", decoding: "async" });
   }
   var tilesViste = false;
   function costruisciTile() {
