@@ -234,7 +234,7 @@ html[data-theme="dark"] .numeri strong { background: linear-gradient(180deg, #ff
   .js-anim .rivela { opacity: 1; }
   .js-anim .rivela.visto { animation: none; }
   .hero-testo > *, .hv-quota { animation: none; opacity: 1; }
-  .anello, .marquee-pista { animation: none; }
+  .anello { animation: none; }
   .hv-poster, .hv-canvas { transition: none; }
 }
 

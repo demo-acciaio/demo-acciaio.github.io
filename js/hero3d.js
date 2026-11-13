@@ -10,7 +10,7 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
   var box = document.querySelector(".hero-visual");
   if (!box) return;
   var canvas = box.querySelector(".hv-canvas");
-  var ridotto = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ridotto = false; // rotazione lenta sempre attiva (anche con "riduci animazioni" di Windows): è il cuore visivo della pagina
 
   var ANGOLO_INIZIO = 0.6;   // stesso angolo della foto segnaposto
   var INCLINAZIONE = -1.0;   // quanto il pezzo e' inclinato verso chi guarda
