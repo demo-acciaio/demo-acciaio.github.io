@@ -310,3 +310,4 @@ html[data-theme="dark"] .logo-scuro { display: block; }
 .anteprima-pdf { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 @media (max-width: 1049.98px) and (orientation: portrait) { .file-step, .file-pdf { grid-template-columns: 1fr; } }
 @media (max-width: 440px) { .viewer3d { height: 240px; } .dropzone { padding: 1.2rem .8rem; } }
+.link-piede { border: 0; background: none; padding: 0 0 0 .6rem; color: var(--blu); font-weight: 700; text-decoration: underline; cursor: pointer; font-size: inherit; }

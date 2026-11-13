@@ -670,7 +670,9 @@
     var lista = richieste();
     var wrap = el("div", { class: "contenitore az" });
     wrap.appendChild(el("div", { class: "az-barra" }, el("div", null, el("p", { class: "sopratitolo", text: "Vista azienda" }), el("h2", { text: "Richieste ricevute" })),
-      el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { location.hash = "#/"; } }, "← Torna al sito")));
+      el("div", { class: "az-azioni", style: "margin:0" },
+        bottoneAzzera("btn btn-ghost btn-sm"),
+        el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () { location.hash = "#/"; } }, "← Torna al sito"))));
     wrap.appendChild(el("div", { class: "az-banner", text: "È quello che vede l'ufficio di Artigiancavi: ogni richiesta arriva già con il prezzo calcolato dallo schedario dei costi. L'ufficio controlla, ritocca se vuole e invia l'offerta." }));
     var tabs = el("div", { class: "az-tabs", role: "tablist" });
     [["richieste", "Richieste (" + lista.length + ")"], ["schedario", "Schedario dei costi"]].forEach(function (t) {
@@ -791,6 +793,39 @@
   /* ==========================================================================
      NAVIGAZIONE, TEMA, MENU
      ========================================================================== */
+  // Riporta la demo come al primo accesso: richieste, schedario e configurazione in corso.
+  // Il tema chiaro/scuro scelto non viene toccato.
+  function azzeraDemo() {
+    ["richieste", "richiesteVer", "schedarioOverride"].forEach(function (k) {
+      delete memoria[k];
+      try { localStorage.removeItem(k); } catch (e) { /* ok */ }
+    });
+    ripristinaSchedario();
+    scartaFile();
+    cfg.passo = 1; cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.errori = {};
+    cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" };
+    az.sel = null; az.tab = "richieste";
+    seedRichieste();
+    try { history.replaceState({ cfgPasso: 1 }, "", location.pathname + location.search + "#/"); } catch (e) { /* ok */ }
+    disegna(); route();
+  }
+  // Pulsante con doppio clic: il primo chiede conferma, il secondo azzera (niente finestre del browser)
+  function bottoneAzzera(classe) {
+    var b = el("button", { type: "button", class: classe }, "Azzera la demo");
+    var timer = null;
+    b.addEventListener("click", function () {
+      if (!b.dataset.conferma) {
+        b.dataset.conferma = "1"; b.textContent = "Conferma: cancella tutte le prove";
+        timer = setTimeout(function () { delete b.dataset.conferma; b.textContent = "Azzera la demo"; }, 5000);
+      } else {
+        clearTimeout(timer); azzeraDemo();
+        delete b.dataset.conferma; b.textContent = "Fatto: demo azzerata";
+        setTimeout(function () { b.textContent = "Azzera la demo"; }, 2500);
+      }
+    });
+    return b;
+  }
+
   function vaiA(id) {
     var e = document.getElementById(id);
     if (e) e.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
@@ -815,6 +850,7 @@
     applicaOverride();
     seedRichieste(); // le richieste di esempio esistono subito, cosi' la numerazione parte da RIC-0004
     radice = document.getElementById("configuratore-app");
+    document.getElementById("azzera-slot").appendChild(bottoneAzzera("link-piede"));
 
     var griglia = document.getElementById("griglia-reparti");
     REPARTI.forEach(function (r) {
