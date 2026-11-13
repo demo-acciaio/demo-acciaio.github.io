@@ -488,7 +488,7 @@
     var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p1.titolo") }));
     var griglia = el("div", { class: "reparto-scelta" });
     REPARTI.forEach(function (r) {
-      var ic = fotoReparto(r, "rc-foto");
+      var ic = el("span", { class: "rc-foto-box" }, fotoReparto(r, "rc-foto")); // miniatura ingrandita: si vede il pezzo, non la cornice
       griglia.appendChild(el("button", { type: "button", class: "reparto-card", onclick: function () { scegliReparto(r); } },
         ic, el("span", { class: "rc-testo" }, el("span", { class: "rc-nome", text: repNome(r) }), el("span", { class: "rc-desc", text: t("rep." + r + ".desc") })),
         el("span", { class: "rc-freccia", "aria-hidden": "true", text: "→" })));
