@@ -18,6 +18,8 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
   var ANGOLO_INIZIO = 0.6;    // stesso angolo della foto segnaposto
   var INCLINAZIONE = modo3d ? -1.0 : -0.95;   // quanto il pezzo e' inclinato verso chi guarda
   var VELOCITA = 0.22;        // giri (radianti al secondo)
+  // Il metallo segue il mouse; il disco a matita NO: se si inclina cambiano le zone d'ombra e il tratteggio compare e sparisce
+  var MOUSE_X = modo3d ? 0.35 : 0, MOUSE_Y = modo3d ? 0.18 : 0;
 
   var renderer;
   try {
@@ -111,10 +113,32 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
     p.lineTo(r + fondo, -mezza); p.lineTo(r + fondo, mezza); p.closePath();
     return p;
   }
+  // Normali "morbide": su un cilindro ogni faccetta piatta avrebbe un'ombra diversa e comparirebbero strisce. Si media la normale
+  // delle facce che si toccano in un punto, ma solo se l'angolo fra loro e' piccolo (gli spigoli veri restano netti).
+  function normaliLisce(geom, gradi) {
+    var pos = geom.attributes.position, n = pos.count, soglia = Math.cos(gradi * Math.PI / 180);
+    var facce = [], mappa = {}, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), nf = new THREE.Vector3();
+    var chiave = function (i) { return Math.round(pos.getX(i) * 500) + "," + Math.round(pos.getY(i) * 500) + "," + Math.round(pos.getZ(i) * 500); };
+    for (var i = 0; i < n; i += 3) {
+      a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c.fromBufferAttribute(pos, i + 2);
+      nf.subVectors(b, a).cross(c.clone().sub(a)).normalize();
+      facce.push(nf.clone());
+      for (var k = 0; k < 3; k++) { var ch = chiave(i + k); (mappa[ch] = mappa[ch] || []).push(i / 3); }
+    }
+    var out = new Float32Array(n * 3), m = new THREE.Vector3();
+    for (var t = 0; t < n; t++) {
+      var fi = Math.floor(t / 3), fn = facce[fi]; m.set(0, 0, 0);
+      var vicine = mappa[chiave(t)];
+      for (var q = 0; q < vicine.length; q++) { var g = facce[vicine[q]]; if (g.dot(fn) >= soglia) m.add(g); }
+      m.normalize(); out[t * 3] = m.x; out[t * 3 + 1] = m.y; out[t * 3 + 2] = m.z;
+    }
+    geom.setAttribute("normal", new THREE.BufferAttribute(out, 3));
+    return geom;
+  }
   function estrusione(shape, altezza, smusso, z0) {
     var g = new THREE.ExtrudeGeometry(shape, { depth: altezza - 2 * smusso, bevelEnabled: true, bevelThickness: smusso, bevelSize: smusso, bevelSegments: 2, curveSegments: 96 });
     g.translate(0, 0, z0 + smusso);
-    return g;
+    return normaliLisce(g, 38);
   }
 
   var VERT_MATITA = "varying vec3 vN; void main() { vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
@@ -199,8 +223,8 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
 
   function disegna(t) {
     interno.rotation.z = ANGOLO_INIZIO + (ridotto ? 0 : t * VELOCITA);
-    esterno.rotation.y += (mouseX * 0.35 - esterno.rotation.y) * 0.05;
-    esterno.rotation.x += (INCLINAZIONE + mouseY * 0.18 - esterno.rotation.x) * 0.05;
+    esterno.rotation.y += (mouseX * MOUSE_X - esterno.rotation.y) * 0.05;
+    esterno.rotation.x += (INCLINAZIONE + mouseY * MOUSE_Y - esterno.rotation.x) * 0.05;
     aggiornaUniformi();
     renderer.render(scena, camera);
   }
