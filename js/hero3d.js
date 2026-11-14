@@ -6,6 +6,7 @@
    Il tema chiaro/scuro lo gestisce il CSS (stessa regola dell'immagine a matita): qui si disegna sempre nero su carta bianca. */
 import * as THREE from "three";
 import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
+import { LETTERE, LARGHEZZA, ALTEZZA } from "./logo-lettere.js";
 
 (function () {
   "use strict";
@@ -18,8 +19,7 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
   var ANGOLO_INIZIO = 0.6;    // stesso angolo della foto segnaposto
   var INCLINAZIONE = modo3d ? -1.0 : -0.95;   // quanto il pezzo e' inclinato verso chi guarda
   var VELOCITA = modo3d ? 0.22 : 0.5;   // giri (radianti al secondo)
-  // Il metallo segue il mouse; il disco a matita NO: se si inclina cambiano le zone d'ombra e il tratteggio compare e sparisce
-  var MOUSE_X = modo3d ? 0.35 : 0, MOUSE_Y = modo3d ? 0.18 : 0;
+  var MOUSE_X = 0.35, MOUSE_Y = 0.18;   // inclinazione del metallo col mouse
 
   var renderer;
   try {
@@ -105,7 +105,11 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
     var g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(fuori, 3));
     return new THREE.LineSegments(g, mat);
   }
-  function foroTondo(x, y, r) { var p = new THREE.Path(); p.absarc(x, y, r, 0, Math.PI * 2, true); return p; }
+  // Cerchi come poligoni con punti tutti diversi: con l'arco intero il punto di partenza e quello di arrivo coincidono e
+  // lasciavano una riga verticale dentro i fori.
+  function puntiCerchio(x, y, r, n) { var p = []; for (var i = 0; i < n; i++) { var a = i / n * Math.PI * 2; p.push(new THREE.Vector2(x + r * Math.cos(a), y + r * Math.sin(a))); } return p; }
+  function foroTondo(x, y, r) { return new THREE.Path(puntiCerchio(x, y, r, 72).reverse()); }
+  function cerchioPieno(r, n) { return new THREE.Shape(puntiCerchio(0, 0, r, n)); }
   // Foro centrale con la sede della linguetta (una tacca rettangolare sul lato destro)
   function foroConLinguetta(r, mezza, fondo) {
     var a0 = Math.asin(mezza / r), p = new THREE.Path();
@@ -173,9 +177,39 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
     "  #include <colorspace_fragment>",
     "}"].join("\n");
 
+  // "ARTIGIANCAVI" con le lettere del logo, incisa su un arco della faccia superiore (la base delle lettere sta verso il bordo,
+  // la cima verso il mozzo). Ogni punto della lettera e' portato sull'arco; i lati sono suddivisi cosi' restano curvi.
+  function scrittaIncisa(gruppo, z, centroGradi, bordo, altezza, matRiempi, matL1, matL2) {
+    var sc = altezza / ALTEZZA, rm = bordo - altezza / 2, uc = LARGHEZZA / 2, th0 = centroGradi * Math.PI / 180;
+    var porta = function (pt) { var u = (pt[0] - uc) * sc, v = pt[1] * sc, th = th0 + u / rm, r = bordo - v; return new THREE.Vector2(r * Math.cos(th), r * Math.sin(th)); };
+    var densa = function (poly) {
+      var out = [];
+      for (var i = 0; i < poly.length; i++) {
+        var a = poly[i], b = poly[(i + 1) % poly.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.6));
+        for (var k = 0; k < n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+      }
+      return out;
+    };
+    var linee = function (pts, seme, amp, mat) {
+      var fuori = [], a = new THREE.Vector3(), b = new THREE.Vector3();
+      for (var i = 0; i < pts.length; i++) { var p = pts[i], q = pts[(i + 1) % pts.length]; a.set(p.x, p.y, z + 0.05); b.set(q.x, q.y, z + 0.05); trattoMano(a, b, seme, amp, 2, fuori); }
+      var g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(fuori, 3));
+      return new THREE.LineSegments(g, mat);
+    };
+    LETTERE.forEach(function (l, i) {
+      var est = densa(l.e).map(porta), fori = l.f.map(function (h) { return densa(h).map(porta); });
+      var forma = new THREE.Shape(est); fori.forEach(function (h) { forma.holes.push(new THREE.Path(h)); });
+      var m = new THREE.Mesh(new THREE.ShapeGeometry(forma), matRiempi); m.position.z = z + 0.04; gruppo.add(m);
+      gruppo.add(linee(est, 11 + i, 0.14, matL1), linee(est, 23 + i, 0.3, matL2));
+      fori.forEach(function (h, k) { gruppo.add(linee(h, 41 + i + k, 0.14, matL1)); });
+    });
+  }
+
   function costruisciDiscoMatita() {
     // Misure ricavate dallo schizzo (raggio flangia = 100)
-    var R = 100, SPESS = 26, R_MOZZO = 43, ALT_MOZZO = 36, R_FORO = 22.4, R_FORI = 70, r_foro = 8;
+    var R = 100, SPESS = 26, R_MOZZO = 43, ALT_MOZZO = 36, R_FORO = 22.4, R_FORI = 74, r_foro = 8;
+    var ANGOLI_FORI = [-56, -12, 124, 168].map(function (g) { return g * Math.PI / 180; });   // 4 fori, nei vuoti fra le due scritte
+    var CENTRO_SCRITTA = -124;                                                                   // gradi: la prima scritta sta davanti nell'immagine di partenza
     // La luce e' scelta in modo che la prima immagine (foto di partenza) abbia l'ombra a destra, poi resta fissa SUL PEZZO
     var inizio = new THREE.Matrix4().makeRotationX(INCLINAZIONE).multiply(new THREE.Matrix4().makeRotationZ(ANGOLO_INIZIO));
     var lucePezzo = new THREE.Vector3(-0.70, 0.55, 0.50).normalize().transformDirection(inizio.clone().invert());
@@ -188,12 +222,12 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
     var matLinea2 = new THREE.LineBasicMaterial({ color: 0x2a2a2a, transparent: true, opacity: 0.45 });
     var matLieve = new THREE.LineBasicMaterial({ color: 0x2a2a2a, transparent: true, opacity: 0.55 });
 
-    var flangia = new THREE.Shape(); flangia.absarc(0, 0, R, 0, Math.PI * 2, false);
-    for (var k = 0; k < 8; k++) { var a = k * Math.PI / 4; flangia.holes.push(foroTondo(R_FORI * Math.cos(a), R_FORI * Math.sin(a), r_foro)); }
+    var flangia = cerchioPieno(R, 160);
+    ANGOLI_FORI.forEach(function (a) { flangia.holes.push(foroTondo(R_FORI * Math.cos(a), R_FORI * Math.sin(a), r_foro)); });
     flangia.holes.push(foroTondo(0, 0, R_FORO));
     var gFlangia = estrusione(flangia, SPESS, 1.6, 0);
 
-    var mozzo = new THREE.Shape(); mozzo.absarc(0, 0, R_MOZZO, 0, Math.PI * 2, false);
+    var mozzo = cerchioPieno(R_MOZZO, 120);
     mozzo.holes.push(foroConLinguetta(R_FORO, 3.4, 5.5));
     var gMozzo = estrusione(mozzo, ALT_MOZZO, 0.8, SPESS);
 
@@ -209,11 +243,12 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
     // segni sulla faccia superiore: anello, bordo con gradino, cerchio leggero, svasature dei fori
     var zf = SPESS + 0.06;
     gruppo.add(lineeCerchio(0, 0, zf, 83, 3.1, 0.30, matLinea1), lineeCerchio(0, 0, zf, 78, 4.4, 0.30, matLinea2), lineeCerchio(0, 0, zf, 94, 2.2, 0.3, matLinea2));
-    gruppo.add(lineeCerchio(0, 0, zf, 62, 5.7, 0.35, matLieve));
-    for (var j = 0; j < 8; j++) {
-      var b = j * Math.PI / 4;
+    ANGOLI_FORI.forEach(function (b, j) {
       gruppo.add(lineeCerchio(R_FORI * Math.cos(b), R_FORI * Math.sin(b), zf, r_foro + 2.4, 6.0 + j, 0.25, matLinea1));
-    }
+    });
+    var matIncisione = new THREE.MeshBasicMaterial({ color: 0x5a5a5a, transparent: true, opacity: 0.62, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    scrittaIncisa(gruppo, zf, CENTRO_SCRITTA, 64, 13.5, matIncisione, matLinea1, matLinea2);
+    scrittaIncisa(gruppo, zf, CENTRO_SCRITTA + 180, 64, 13.5, matIncisione, matLinea1, matLinea2);
     gruppo.position.z = -(SPESS + ALT_MOZZO) / 2 + 6;   // il disco sull'asse di rotazione
     gruppo.scale.setScalar(0.64);
     return gruppo;
@@ -233,9 +268,9 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
       esterno.rotation.y += (mouseX * MOUSE_X - esterno.rotation.y) * 0.05;
       esterno.rotation.x += (INCLINAZIONE + mouseY * MOUSE_Y - esterno.rotation.x) * 0.05;
     } else {
-      // il disco a matita oscilla lentamente da una parte all'altra e annuisce: si vedono le superfici girare (all'istante 0 e' come la foto)
-      esterno.rotation.y = 0.42 * Math.sin(t * 0.45);
-      esterno.rotation.x = INCLINAZIONE + 0.09 * Math.sin(t * 0.31);
+      // segue il mouse e in piu' oscilla appena (all'istante 0, con il mouse al centro, e' come la foto): si vedono le superfici girare
+      esterno.rotation.y += (mouseX * 0.38 + 0.16 * Math.sin(t * 0.45) - esterno.rotation.y) * 0.06;
+      esterno.rotation.x += (INCLINAZIONE + mouseY * 0.2 + 0.04 * Math.sin(t * 0.31) - esterno.rotation.x) * 0.06;
     }
     aggiornaUniformi();
     renderer.render(scena, camera);
