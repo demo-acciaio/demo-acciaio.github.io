@@ -219,8 +219,6 @@ html[data-theme="dark"] .hv-poster.p-ruota, html[data-theme="dark"] .hv-poster.p
 .reparto-tile:hover { transform: translateY(-4px); border-color: var(--acc); box-shadow: var(--glow); }
 .reparto-tile:hover::before { opacity: 1; }
 .rt-testa { position: relative; }
-.rt-testa .rt-num { position: absolute; left: .8rem; top: .7rem; z-index: 1; text-shadow: 0 0 8px #050913; }
-.rt-num { font-family: var(--mono); font-size: .78rem; font-weight: 500; letter-spacing: .14em; color: var(--acc); }
 /* schizzo a matita senza cornice: tema chiaro = linee scure (il bianco sparisce); tema scuro = linee chiare (colori invertiti) */
 .rt-foto { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: contain; mix-blend-mode: multiply; transition: transform .4s ease, filter .3s ease; }
 html[data-theme="dark"] .rt-foto { filter: invert(1) brightness(1.15); mix-blend-mode: screen; }

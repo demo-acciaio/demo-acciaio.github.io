@@ -1067,7 +1067,7 @@
     svuota(griglia);
     REPARTI.forEach(function (r, i) {
       var tile = el("button", { type: "button", class: "reparto-tile rivela" + (tilesViste ? " visto subito" : ""), style: "--ritardo:" + (i * 0.09) + "s", onclick: function () { scegliReparto(r); } },
-        el("div", { class: "rt-testa" }, el("span", { class: "rt-num", text: "0" + (i + 1) }), fotoReparto(r, "rt-foto")),
+        el("div", { class: "rt-testa" }, fotoReparto(r, "rt-foto")),
         el("div", { class: "rt-testo" }, el("h3", { text: repNome(r) }), el("p", { text: t("rep." + r + ".desc") })),
         el("span", { class: "vai", text: t("vai.configura") }));
       griglia.appendChild(tile);
