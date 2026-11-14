@@ -1,4 +1,4 @@
-// Genera le foto di partenza del pezzo a linee (img/hero-schizzo-scuro.png e hero-schizzo-chiaro.png), scattandole dal pezzo 3D vero.
+// Genera le foto di partenza del pezzo a linee (img/hero-ruota.png: nero su carta bianca, il tema lo gestisce il CSS), scattandole dal pezzo 3D vero.
 // Uso: avviare un server locale nella cartella del progetto (py -m http.server 8123), poi:
 //   node strumenti/genera_poster_schizzo.js <cartella-profilo-temporanea> [cartella-uscita]
 // Poi convertire in WebP 900x900 con Pillow e tenere solo i .webp.
@@ -23,11 +23,9 @@ const dormi = (ms) => new Promise((r) => setTimeout(r, ms));
   await cmd("Page.navigate", { url: "http://127.0.0.1:8123/index.html" });
   let ok = false; for (let i = 0; i < 80; i++) { await dormi(400); if (await val("!!(window.HERO && window.HERO.pronto())")) { ok = true; break; } }
   if (!ok) throw new Error("il pezzo 3D non e' pronto");
-  for (const tema of ["scuro", "chiaro"]) {
-    const url = await val("window.HERO.scatta(1200, " + JSON.stringify(tema) + ")");
-    const f = path.join(USCITA, "hero-schizzo-" + tema + ".png");
-    fs.writeFileSync(f, Buffer.from(url.split(",")[1], "base64"));
-    console.log("scritta", f, Math.round(fs.statSync(f).size / 1024) + " KB");
-  }
+  const url = await val("window.HERO.scatta(1200)");
+  const fp = path.join(USCITA, "hero-ruota.png");
+  fs.writeFileSync(fp, Buffer.from(url.split(",")[1], "base64"));
+  console.log("scritta", fp, Math.round(fs.statSync(fp).size / 1024) + " KB");
   ws.close(); proc.kill(); process.exit(0);
 })().catch(e => { console.error("ERRORE", e.message); proc.kill(); process.exit(1); });

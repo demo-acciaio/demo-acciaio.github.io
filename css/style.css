@@ -164,11 +164,14 @@ html[data-theme="dark"] .btn-primario:hover:not([disabled]) { background: linear
 .hv-poster, .hv-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hv-poster { object-fit: contain; transition: opacity .8s ease .55s; }
 .hv-poster { display: none; }
-html:not(.disco-3d):not(.disco-rotante) .hv-poster.p-matita { display: block; }
-html[data-theme="dark"].disco-rotante .hv-poster.p-scuro, html[data-theme="light"].disco-rotante .hv-poster.p-chiaro, html.disco-3d .hv-poster.p-3d { display: block; }
-/* schizzo a matita (immagine): tema chiaro = il bianco sparisce; tema scuro = colori invertiti, linee chiare su fondo scuro; leggero "respiro" */
-.hv-poster.p-matita { mix-blend-mode: multiply; animation: respira 9s ease-in-out infinite; }
-html[data-theme="dark"] .hv-poster.p-matita { filter: invert(1) brightness(1.12); mix-blend-mode: screen; }
+html:not(.disco-3d):not(.disco-immagine) .hv-poster.p-ruota { display: block; }
+html.disco-immagine .hv-poster.p-matita { display: block; }
+html.disco-3d .hv-poster.p-3d { display: block; }
+/* disco a matita (foto di partenza, schizzo fermo e canvas che ruota): nero su carta bianca. Tema chiaro: il bianco sparisce (multiply).
+   Tema scuro: colori invertiti (linee chiare su fondo scuro). Cosi' il disco e' sempre uguale agli altri disegni del sito. */
+.hv-poster.p-ruota, .hv-poster.p-matita, .hv-canvas.matita { mix-blend-mode: multiply; }
+html[data-theme="dark"] .hv-poster.p-ruota, html[data-theme="dark"] .hv-poster.p-matita, html[data-theme="dark"] .hv-canvas.matita { filter: invert(1) brightness(1.12); mix-blend-mode: screen; }
+.hv-poster.p-matita { animation: respira 9s ease-in-out infinite; }
 @keyframes respira { 0%, 100% { transform: translateY(0) rotate(-.5deg); } 50% { transform: translateY(-9px) rotate(.5deg); } }
 @media (prefers-reduced-motion: reduce) { .hv-poster.p-matita { animation: none; } }
 .hv-canvas { opacity: 0; transition: opacity .8s ease; }
