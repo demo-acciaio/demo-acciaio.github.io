@@ -31,8 +31,8 @@
 <link rel="preload" as="fetch" href="img/hero-pezzo.bin" crossorigin>
 <link rel="modulepreload" href="js/vendor/three.module.min.js">
 <link rel="modulepreload" href="js/vendor/RoomEnvironment.js">
-<link rel="modulepreload" href="js/hero3d.js?v=46">
-<link rel="stylesheet" href="css/style.css?v=46">
+<link rel="modulepreload" href="js/hero3d.js?v=47">
+<link rel="stylesheet" href="css/style.css?v=47">
 </head>
 <body>
 
@@ -51,8 +51,10 @@
   <div class="top-azioni">
     <div class="lingue lingue-testa" data-lingue role="group" data-i18n-attr="aria-label:lang.scelta" aria-label="Lingua"></div>
     <button class="btn btn-ghost btn-sm" id="btn-vista-azienda" type="button">Vista azienda</button>
-    <button class="icona" id="btn-tema" type="button" data-i18n-attr="aria-label:tema.cambia" aria-label="Cambia tema chiaro/scuro">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A6 6 0 0 1 12.4 3.1 9 9 0 0 0 12 3z"/></svg>
+    <button class="icona selettore-tema" id="btn-tema" type="button" aria-pressed="true" data-i18n-attr="aria-label:tema.cambia" aria-label="Cambia tema chiaro/scuro">
+      <span class="manopola" aria-hidden="true"></span>
+      <svg class="sole" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      <svg class="luna" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A6 6 0 0 1 12.4 3.1 9 9 0 0 0 12 3z"/></svg>
     </button>
     <button class="icona solo-mobile" id="btn-menu" type="button" data-i18n-attr="aria-label:menu.apri" aria-label="Apri il menu" aria-expanded="false">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
@@ -156,12 +158,12 @@
   </div>
 </footer>
 
-<script src="js/schedario.js?v=46"></script>
-<script src="js/prezzi.js?v=46"></script>
-<script src="js/testi.js?v=46"></script>
-<script src="js/i18n.js?v=46"></script>
-<script src="js/file.js?v=46"></script>
-<script src="js/app.js?v=46"></script>
-<script type="module" src="js/hero3d.js?v=46"></script>
+<script src="js/schedario.js?v=47"></script>
+<script src="js/prezzi.js?v=47"></script>
+<script src="js/testi.js?v=47"></script>
+<script src="js/i18n.js?v=47"></script>
+<script src="js/file.js?v=47"></script>
+<script src="js/app.js?v=47"></script>
+<script type="module" src="js/hero3d.js?v=47"></script>
 </body>
 </html>

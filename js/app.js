@@ -1159,8 +1159,10 @@
     document.getElementById("btn-tema").addEventListener("click", function () {
       var nuovo = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", nuovo);
+      this.setAttribute("aria-pressed", String(nuovo === "dark"));
       try { localStorage.setItem("tema", nuovo); } catch (e) { /* ok */ }
     });
+    document.getElementById("btn-tema").setAttribute("aria-pressed", String(document.documentElement.getAttribute("data-theme") === "dark"));
     document.getElementById("btn-menu").addEventListener("click", function () {
       var m = document.getElementById("menu"), aperto = m.classList.toggle("aperto");
       this.setAttribute("aria-expanded", String(aperto));

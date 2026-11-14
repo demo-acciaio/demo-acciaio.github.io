@@ -655,3 +655,18 @@ html[data-theme="light"] .anello.a3 { stroke: rgba(0, 105, 180, .20); }
 html[data-theme="light"] .hv-quota { color: var(--titolo); border-color: rgba(0, 105, 180, .5); background: rgba(255, 255, 255, .85); }
 html[data-theme="light"] .hv-quota.q1::after, html[data-theme="light"] .hv-quota.q3::after { background: linear-gradient(90deg, rgba(0, 105, 180, .7), transparent); }
 html[data-theme="light"] .hv-quota.q2::after, html[data-theme="light"] .hv-quota.q4::after { background: linear-gradient(270deg, rgba(0, 105, 180, .7), transparent); }
+
+
+/* ==========================================================================
+   11. SELETTORE TEMA: SOLE E LUNA
+   Interruttore a pillola con le due icone; la manopola sta sul tema attivo (sole = chiaro, luna = scuro).
+   ========================================================================== */
+.icona.selettore-tema { position: relative; width: 4.5rem; height: 2.4rem; display: flex; align-items: center; justify-content: space-between; padding: 0 .62rem; border-radius: 999px; background: var(--bg-2); }
+.selettore-tema svg { position: relative; z-index: 1; width: 1.15rem; height: 1.15rem; transition: color .3s ease, transform .4s ease; }
+.selettore-tema .manopola { position: absolute; top: 3px; left: 3px; width: calc(2.4rem - 8px); height: calc(2.4rem - 8px); border-radius: 50%; background: var(--acc); box-shadow: 0 2px 8px -2px rgba(0, 0, 0, .45); transition: transform .4s cubic-bezier(.3, .7, .2, 1); }
+html[data-theme="light"] .selettore-tema .sole { color: #fff; transform: rotate(90deg); }
+html[data-theme="light"] .selettore-tema .luna { color: var(--muted); }
+html[data-theme="dark"] .selettore-tema .manopola { transform: translateX(2.1rem); }
+html[data-theme="dark"] .selettore-tema .luna { color: #03121f; }
+html[data-theme="dark"] .selettore-tema .sole { color: var(--muted); }
+.selettore-tema:hover { border-color: var(--acc); color: inherit; }
