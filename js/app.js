@@ -1037,8 +1037,15 @@
       az.dentro = false;
       setTimeout(function () { vaiA(h.slice(1)); }, 0);
     } else { window.scrollTo(0, 0); }
-    document.getElementById("menu").classList.remove("aperto");
-    document.getElementById("btn-menu").setAttribute("aria-expanded", "false");
+    impostaMenu(false);
+  }
+  // Menu a tendina del telefono: apre/chiude e tiene allineati classe, icona (barrette/croce) ed etichetta
+  function impostaMenu(aperto) {
+    var m = document.getElementById("menu"), b = document.getElementById("btn-menu");
+    if (!m || !b) return;
+    m.classList.toggle("aperto", aperto);
+    b.setAttribute("aria-expanded", String(aperto));
+    b.setAttribute("aria-label", t(aperto ? "menu.chiudi" : "menu.apri"));
   }
 
   // Selettore di lingua: due copie (intestazione e menu del telefono), stessi pulsanti
@@ -1163,15 +1170,25 @@
       try { localStorage.setItem("tema", nuovo); } catch (e) { /* ok */ }
     });
     document.getElementById("btn-tema").setAttribute("aria-pressed", String(document.documentElement.getAttribute("data-theme") === "dark"));
-    document.getElementById("btn-menu").addEventListener("click", function () {
-      var m = document.getElementById("menu"), aperto = m.classList.toggle("aperto");
-      this.setAttribute("aria-expanded", String(aperto));
+    // Menu a tendina del telefono: si chiude col tondino, toccando fuori dalla tendina, con Esc, scegliendo una voce o ruotando/ingrandendo lo schermo
+    var menuEl = document.getElementById("menu"), btnMenu = document.getElementById("btn-menu");
+    btnMenu.addEventListener("click", function () { impostaMenu(!menuEl.classList.contains("aperto")); });
+    // tocco fuori: chiude e (se non e' sulla barra in alto) non fa altro, cosi' non si preme per sbaglio un pulsante sotto
+    document.addEventListener("click", function (ev) {
+      if (!menuEl.classList.contains("aperto")) return;
+      if (menuEl.contains(ev.target) || btnMenu.contains(ev.target)) return;
+      impostaMenu(false);
+      if (!ev.target.closest || !ev.target.closest(".top")) { ev.preventDefault(); ev.stopPropagation(); }
+    }, true);
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && menuEl.classList.contains("aperto")) { impostaMenu(false); btnMenu.focus(); }
     });
+    window.addEventListener("resize", function () { if (window.innerWidth >= 1050 && menuEl.classList.contains("aperto")) impostaMenu(false); });
     document.querySelectorAll("[data-vai]").forEach(function (a) {
       a.addEventListener("click", function (ev) {
         ev.preventDefault();
         if (location.hash.indexOf("#/azienda") === 0) { location.hash = "#" + a.getAttribute("data-vai"); }
-        else { vaiA(a.getAttribute("data-vai")); document.getElementById("menu").classList.remove("aperto"); }
+        else { vaiA(a.getAttribute("data-vai")); impostaMenu(false); }
       });
     });
     window.addEventListener("hashchange", route);

@@ -687,3 +687,9 @@ html[data-theme="dark"] .selettore-tema .sole { color: var(--muted); }
 
 /* "Premuto" sul telefono per i riquadri: va dopo le regole :hover, altrimenti il tocco non si vede */
 .reparto-card:active, .reparto-tile:active { transform: scale(.98); }
+
+
+/* Tondino del menu: tre barrette da chiuso, croce da aperto */
+#btn-menu .ico-croce { display: none; }
+#btn-menu[aria-expanded="true"] .ico-barrette { display: none; }
+#btn-menu[aria-expanded="true"] .ico-croce { display: block; }

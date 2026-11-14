@@ -10,7 +10,7 @@ it: {
   "nav.home": "Home", "nav.principale": "Principale",
   "nav.lavorazioni": "Lavorazioni", "nav.come": "Come funziona", "nav.configuratore": "Configuratore",
   "nav.azienda": "Vista azienda", "nav.torna": "Torna al sito",
-  "tema.cambia": "Cambia tema chiaro/scuro", "menu.apri": "Apri il menu",
+  "tema.cambia": "Cambia tema chiaro/scuro", "menu.apri": "Apri il menu", "menu.chiudi": "Chiudi il menu",
   "lang.scelta": "Lingua", "lang.it": "Italiano", "lang.de": "Tedesco", "lang.en": "Inglese",
 
   "hero.sopra": "Lavorazioni meccaniche di precisione · Trento",
@@ -173,7 +173,7 @@ de: {
   "nav.home": "Startseite", "nav.principale": "Hauptmenü",
   "nav.lavorazioni": "Bearbeitung", "nav.come": "So funktioniert's", "nav.configuratore": "Konfigurator",
   "nav.azienda": "Firmenansicht", "nav.torna": "Zurück zur Seite",
-  "tema.cambia": "Helles/dunkles Design wechseln", "menu.apri": "Menü öffnen",
+  "tema.cambia": "Helles/dunkles Design wechseln", "menu.apri": "Menü öffnen", "menu.chiudi": "Menü schließen",
   "lang.scelta": "Sprache", "lang.it": "Italienisch", "lang.de": "Deutsch", "lang.en": "Englisch",
 
   "hero.sopra": "Präzise mechanische Fertigung · Trient",
@@ -356,7 +356,7 @@ en: {
   "nav.home": "Home", "nav.principale": "Main",
   "nav.lavorazioni": "Machining", "nav.come": "How it works", "nav.configuratore": "Configurator",
   "nav.azienda": "Company view", "nav.torna": "Back to the site",
-  "tema.cambia": "Switch light/dark theme", "menu.apri": "Open the menu",
+  "tema.cambia": "Switch light/dark theme", "menu.apri": "Open the menu", "menu.chiudi": "Close the menu",
   "lang.scelta": "Language", "lang.it": "Italian", "lang.de": "German", "lang.en": "English",
 
   "hero.sopra": "Precision mechanical machining · Trento",
