@@ -167,7 +167,7 @@ html[data-theme="dark"] .btn-primario:hover:not([disabled]) { background: linear
 /* Il pezzo: foto segnaposto subito, 3D vivo che prende il suo posto con una dissolvenza */
 .hero-visual { position: relative; width: min(100%, 38.75rem); aspect-ratio: 1 / 1; justify-self: end; }
 .hv-poster, .hv-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hv-poster { object-fit: contain; transition: opacity .8s ease .55s; }
+.hv-poster { object-fit: contain; }   /* scambio foto -> disco ISTANTANEO: con la dissolvenza i due disegni (e le scritte) si vedevano sovrapposti */
 .hv-poster { display: none; }
 html:not(.disco-3d):not(.disco-immagine) .hv-poster.p-ruota { display: block; }
 html.disco-immagine .hv-poster.p-matita { display: block; }
@@ -179,7 +179,7 @@ html[data-theme="dark"] .hv-poster.p-ruota, html[data-theme="dark"] .hv-poster.p
 .hv-poster.p-matita { animation: respira 9s ease-in-out infinite; }
 @keyframes respira { 0%, 100% { transform: translateY(0) rotate(-.5deg); } 50% { transform: translateY(-9px) rotate(.5deg); } }
 @media (prefers-reduced-motion: reduce) { .hv-poster.p-matita { animation: none; } }
-.hv-canvas { opacity: 0; transition: opacity .8s ease; }
+.hv-canvas { opacity: 0; }
 .hero-visual.pronto .hv-canvas { opacity: 1; }
 .hero-visual.pronto .hv-poster { opacity: 0; }
 .hv-anelli { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }

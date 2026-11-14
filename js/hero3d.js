@@ -282,8 +282,9 @@ import { LETTERE, LARGHEZZA, ALTEZZA } from "./logo-lettere.js";
     adatta();
     disegna(0);                                   // primo fotogramma: identico alla foto segnaposto
     requestAnimationFrame(function () {
-      box.classList.add("pronto");                // dissolvenza foto -> 3D
+      box.classList.add("pronto");                // scambio foto -> 3D: il primo fotogramma e' identico alla foto, quindi nessuna sovrapposizione
       pronto = true;
+      t0 = performance.now();                     // la rotazione parte da zero in questo momento (prima partiva con il tempo gia' passato dal caricamento: salto)
       requestAnimationFrame(ciclo);
     });
   }
