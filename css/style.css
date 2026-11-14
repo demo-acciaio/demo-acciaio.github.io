@@ -52,6 +52,11 @@ html[data-theme="dark"] {
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+/* Telefono: niente rettangolo azzurrino al tocco (come negli altri progetti). Resta il segno della tastiera (:focus-visible) e un piccolo
+   "premuto" sui riquadri, cosi' si capisce lo stesso che il tocco e' arrivato. */
+* { -webkit-tap-highlight-color: transparent; }
+a, button, [role="button"], label, summary { touch-action: manipulation; }
+.btn:active, .scelta:active, .reparto-card:active, .reparto-tile:active, .icona:active { transform: scale(.97); }
 html { font-size: clamp(16px, 1vw, 32px); scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 12px); -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; min-height: 100%; }
 body { font-family: var(--font); font-size: 1rem; line-height: 1.55; color: var(--ink); background: var(--bg); overflow-x: hidden; }
@@ -679,3 +684,6 @@ html[data-theme="dark"] .selettore-tema .manopola { transform: translateX(2.1rem
 html[data-theme="dark"] .selettore-tema .luna { color: #03121f; }
 html[data-theme="dark"] .selettore-tema .sole { color: var(--muted); }
 .selettore-tema:hover { border-color: var(--acc); color: inherit; }
+
+/* "Premuto" sul telefono per i riquadri: va dopo le regole :hover, altrimenti il tocco non si vede */
+.reparto-card:active, .reparto-tile:active { transform: scale(.98); }
