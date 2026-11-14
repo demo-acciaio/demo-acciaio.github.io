@@ -177,19 +177,11 @@ import { LETTERE, LARGHEZZA, ALTEZZA } from "./logo-lettere.js";
     "  #include <colorspace_fragment>",
     "}"].join("\n");
 
-  // "ARTIGIANCAVI" con le lettere del logo, incisa su un arco della faccia superiore (la base delle lettere sta verso il bordo,
-  // la cima verso il mozzo). Ogni punto della lettera e' portato sull'arco; i lati sono suddivisi cosi' restano curvi.
-  function scrittaIncisa(gruppo, z, centroGradi, bordo, altezza, matRiempi, matL1, matL2) {
-    var sc = altezza / ALTEZZA, rm = bordo - altezza / 2, uc = LARGHEZZA / 2, th0 = centroGradi * Math.PI / 180;
-    var porta = function (pt) { var u = (pt[0] - uc) * sc, v = pt[1] * sc, th = th0 + u / rm, r = bordo - v; return new THREE.Vector2(r * Math.cos(th), r * Math.sin(th)); };
-    var densa = function (poly) {
-      var out = [];
-      for (var i = 0; i < poly.length; i++) {
-        var a = poly[i], b = poly[(i + 1) % poly.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.6));
-        for (var k = 0; k < n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
-      }
-      return out;
-    };
+  // "ARTIGIANCAVI" con le lettere del logo, incisa su un arco della faccia superiore (base delle lettere verso il bordo, cima verso il mozzo).
+  // Ogni lettera e' un corpo rigido: si sposta e ruota sull'arco ma NON si deforma (cosi' i lati restano dritti e le cime non si accavallano);
+  // la spaziatura e' piu' larga di quella del logo, dove le lettere quasi si toccano.
+  function scrittaIncisa(gruppo, z, centroGradi, bordo, altezza, spaziatura, matRiempi, matL1, matL2) {
+    var sc = altezza / ALTEZZA, rc = bordo - altezza / 2, uc = LARGHEZZA / 2, th0 = centroGradi * Math.PI / 180;
     var linee = function (pts, seme, amp, mat) {
       var fuori = [], a = new THREE.Vector3(), b = new THREE.Vector3();
       for (var i = 0; i < pts.length; i++) { var p = pts[i], q = pts[(i + 1) % pts.length]; a.set(p.x, p.y, z + 0.05); b.set(q.x, q.y, z + 0.05); trattoMano(a, b, seme, amp, 2, fuori); }
@@ -197,18 +189,22 @@ import { LETTERE, LARGHEZZA, ALTEZZA } from "./logo-lettere.js";
       return new THREE.LineSegments(g, mat);
     };
     LETTERE.forEach(function (l, i) {
-      var est = densa(l.e).map(porta), fori = l.f.map(function (h) { return densa(h).map(porta); });
+      var xs = l.e.map(function (p) { return p[0]; }), cx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+      var th = th0 + (cx - uc) * sc * spaziatura / rc, c = Math.cos(th), sn = Math.sin(th);
+      // u = lungo l'arco (tangente), v = verso il mozzo (da -altezza/2 alla base a +altezza/2 in cima)
+      var porta = function (pt) { var u = (pt[0] - cx) * sc, v = pt[1] * sc - altezza / 2, r = rc - v; return new THREE.Vector2(r * c - u * sn, r * sn + u * c); };
+      var est = l.e.map(porta), fori = l.f.map(function (h) { return h.map(porta); });
       var forma = new THREE.Shape(est); fori.forEach(function (h) { forma.holes.push(new THREE.Path(h)); });
       var m = new THREE.Mesh(new THREE.ShapeGeometry(forma), matRiempi); m.position.z = z + 0.04; gruppo.add(m);
-      gruppo.add(linee(est, 11 + i, 0.14, matL1), linee(est, 23 + i, 0.3, matL2));
-      fori.forEach(function (h, k) { gruppo.add(linee(h, 41 + i + k, 0.14, matL1)); });
+      gruppo.add(linee(est, 11 + i, 0.07, matL1), linee(est, 23 + i, 0.15, matL2));
+      fori.forEach(function (h, k) { gruppo.add(linee(h, 41 + i + k, 0.07, matL1)); });
     });
   }
 
   function costruisciDiscoMatita() {
     // Misure ricavate dallo schizzo (raggio flangia = 100)
     var R = 100, SPESS = 26, R_MOZZO = 43, ALT_MOZZO = 36, R_FORO = 22.4, R_FORI = 74, r_foro = 8;
-    var ANGOLI_FORI = [-56, -12, 124, 168].map(function (g) { return g * Math.PI / 180; });   // 4 fori, nei vuoti fra le due scritte
+    var ANGOLI_FORI = [-34, 146].map(function (g) { return g * Math.PI / 180; });             // 2 fori, uno per parte: interrompono le due scritte
     var CENTRO_SCRITTA = -124;                                                                   // gradi: la prima scritta sta davanti nell'immagine di partenza
     // La luce e' scelta in modo che la prima immagine (foto di partenza) abbia l'ombra a destra, poi resta fissa SUL PEZZO
     var inizio = new THREE.Matrix4().makeRotationX(INCLINAZIONE).multiply(new THREE.Matrix4().makeRotationZ(ANGOLO_INIZIO));
@@ -247,8 +243,8 @@ import { LETTERE, LARGHEZZA, ALTEZZA } from "./logo-lettere.js";
       gruppo.add(lineeCerchio(R_FORI * Math.cos(b), R_FORI * Math.sin(b), zf, r_foro + 2.4, 6.0 + j, 0.25, matLinea1));
     });
     var matIncisione = new THREE.MeshBasicMaterial({ color: 0x5a5a5a, transparent: true, opacity: 0.62, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    scrittaIncisa(gruppo, zf, CENTRO_SCRITTA, 64, 13.5, matIncisione, matLinea1, matLinea2);
-    scrittaIncisa(gruppo, zf, CENTRO_SCRITTA + 180, 64, 13.5, matIncisione, matLinea1, matLinea2);
+    scrittaIncisa(gruppo, zf, CENTRO_SCRITTA, 64, 13.5, 1.23, matIncisione, matLinea1, matLinea2);
+    scrittaIncisa(gruppo, zf, CENTRO_SCRITTA + 180, 64, 13.5, 1.23, matIncisione, matLinea1, matLinea2);
     gruppo.position.z = -(SPESS + ALT_MOZZO) / 2 + 6;   // il disco sull'asse di rotazione
     gruppo.scale.setScalar(0.64);
     return gruppo;
