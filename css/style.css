@@ -133,7 +133,7 @@ html[data-theme="dark"] .btn-primario:hover:not([disabled]) { background: linear
 .menu a:hover { border-color: var(--blu); color: var(--blu); }
 .top-azioni { display: flex; align-items: center; gap: .6rem; }
 
-/* Prima schermata: sempre scura, in entrambi i temi */
+/* Prima schermata: blu notte nel tema scuro; nel tema chiaro e' su carta da disegno tecnico (vedi sezione 10) */
 .hero { position: relative; isolation: isolate; min-height: max(560px, calc(100dvh - var(--header-h))); display: flex; align-items: center; color: #fff; background: #050913; overflow: hidden; }
 .hero-sfondo { position: absolute; inset: 0; z-index: -1; background:
   radial-gradient(55% 70% at 74% 48%, rgba(34, 211, 238, .20) 0%, transparent 62%),
@@ -163,6 +163,8 @@ html[data-theme="dark"] .btn-primario:hover:not([disabled]) { background: linear
 .hero-visual { position: relative; width: min(100%, 38.75rem); aspect-ratio: 1 / 1; justify-self: end; }
 .hv-poster, .hv-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hv-poster { object-fit: contain; transition: opacity .8s ease .55s; }
+.hv-poster { display: none; }
+html[data-theme="dark"]:not(.disco-3d) .hv-poster.p-scuro, html[data-theme="light"]:not(.disco-3d) .hv-poster.p-chiaro, html.disco-3d .hv-poster.p-3d { display: block; }
 .hv-canvas { opacity: 0; transition: opacity .8s ease; }
 .hero-visual.pronto .hv-canvas { opacity: 1; }
 .hero-visual.pronto .hv-poster { opacity: 0; }
@@ -627,3 +629,29 @@ html[data-theme="dark"] .prezzo-grande { background: linear-gradient(180deg, #ff
   .cfg-sezione .scelte.compatte { grid-template-columns: repeat(var(--colc, 3), minmax(0, 1fr)); }
   .cfg-sezione .scelte.compatte > .scelta { text-align: center; padding-inline: .4rem; }
 }
+
+
+/* ==========================================================================
+   10. PRIMA SCHERMATA SU CARTA DA DISEGNO TECNICO (TEMA CHIARO)
+   Fondo chiaro con la stessa quadrettatura in azzurro tenue, scritte blu scuro: niente blocco blu notte sopra la pagina bianca.
+   ========================================================================== */
+html[data-theme="light"] .hero { color: var(--ink); background: #f5f8fd; border-bottom: 1px solid var(--line); }
+html[data-theme="light"] .hero-sfondo { background:
+  radial-gradient(55% 70% at 74% 48%, rgba(0, 105, 180, .10) 0%, transparent 62%),
+  radial-gradient(45% 60% at 8% 92%, rgba(59, 155, 255, .13) 0%, transparent 66%),
+  linear-gradient(180deg, #f8fbff 0%, #e9f0fa 100%); }
+html[data-theme="light"] .hero-griglia { background-image: linear-gradient(rgba(0, 105, 180, .14) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 105, 180, .14) 1px, transparent 1px); }
+html[data-theme="light"] .hero .sopratitolo { color: var(--acc); }
+html[data-theme="light"] .hero h1 { color: var(--titolo); }
+html[data-theme="light"] .hero h1 .accento { background: linear-gradient(90deg, #0069b4 0%, #1aa3d6 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html[data-theme="light"] .hero .lead { color: rgba(27, 35, 64, .84); }
+html[data-theme="light"] .hero-punti { color: var(--muted); }
+html[data-theme="light"] .hero-punti strong { color: var(--titolo); }
+html[data-theme="light"] .hero .btn-contorno { border-color: var(--titolo); color: var(--titolo); }
+html[data-theme="light"] .hero .btn-contorno:hover { background: rgba(0, 105, 180, .08); }
+html[data-theme="light"] .anello { stroke: rgba(0, 105, 180, .30); }
+html[data-theme="light"] .anello.a1 { stroke: rgba(0, 105, 180, .55); }
+html[data-theme="light"] .anello.a3 { stroke: rgba(0, 105, 180, .20); }
+html[data-theme="light"] .hv-quota { color: var(--titolo); border-color: rgba(0, 105, 180, .5); background: rgba(255, 255, 255, .85); }
+html[data-theme="light"] .hv-quota.q1::after, html[data-theme="light"] .hv-quota.q3::after { background: linear-gradient(90deg, rgba(0, 105, 180, .7), transparent); }
+html[data-theme="light"] .hv-quota.q2::after, html[data-theme="light"] .hv-quota.q4::after { background: linear-gradient(270deg, rgba(0, 105, 180, .7), transparent); }
