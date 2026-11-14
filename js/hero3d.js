@@ -17,7 +17,7 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
   var modo3d = document.documentElement.classList.contains("disco-3d");
   var ANGOLO_INIZIO = 0.6;    // stesso angolo della foto segnaposto
   var INCLINAZIONE = modo3d ? -1.0 : -0.95;   // quanto il pezzo e' inclinato verso chi guarda
-  var VELOCITA = 0.22;        // giri (radianti al secondo)
+  var VELOCITA = modo3d ? 0.22 : 0.5;   // giri (radianti al secondo)
   // Il metallo segue il mouse; il disco a matita NO: se si inclina cambiano le zone d'ombra e il tratteggio compare e sparisce
   var MOUSE_X = modo3d ? 0.35 : 0, MOUSE_Y = modo3d ? 0.18 : 0;
 
@@ -141,31 +141,34 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
     return normaliLisce(g, 38);
   }
 
-  var VERT_MATITA = "varying vec3 vN; void main() { vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
+  // Tutto e' calcolato nello spazio del PEZZO (normali, posizione, luce): quando il disco gira o oscilla, ombra e tratteggio restano
+  // attaccati alla superficie come disegnati sopra, senza "righe che scorrono" e senza zone che appaiono o spariscono.
+  var VERT_MATITA = "varying vec3 vNo; varying vec3 vPo; void main() { vNo = normal; vPo = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
   var FRAG_MATITA = [
-    "uniform vec3 uCarta; uniform vec3 uInchiostro; uniform float uAltezza; varying vec3 vN;",
+    "uniform vec3 uCarta; uniform vec3 uInchiostro; uniform vec3 uLobj; uniform float uPasso; varying vec3 vNo; varying vec3 vPo;",
     "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
     "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);",
     "  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }",
-    // una riga di matita: spessore w, la pressione varia lungo il foglio
-    "float tratto(float coord, float sp, float w, vec2 q) {",
-    "  float s = abs(fract(coord / sp) - 0.5) * 2.0;",
-    "  float pressione = 0.50 + 0.50 * noise(q * 0.07);",
-    "  return step(0.02, w) * smoothstep(1.0 - w - 0.14, 1.0 - w, s) * pressione; }",
+    // una riga di matita sul pezzo; si attenua da sola dove le righe diventerebbero troppo fitte sullo schermo (niente effetto moire')
+    "float riga(float c, float w) {",
+    "  float fw = fwidth(c); float s = abs(fract(c) - 0.5) * 2.0;",
+    "  float r = smoothstep(1.0 - w - 2.0 * fw, 1.0 - w, s);",
+    "  return step(0.02, w) * r * (1.0 - smoothstep(0.28, 0.55, fw)); }",
     "void main() {",
-    "  vec3 n = normalize(vN); vec3 L = normalize(vec3(-0.70, 0.55, 0.50));",
-    "  float luce = max(dot(n, L), 0.0);",
+    "  vec3 n = normalize(vNo);",
+    "  float luce = max(dot(n, normalize(uLobj)), 0.0);",
     "  float ombra = 1.0 - (0.34 + 0.66 * luce);",
-    "  vec2 q = gl_FragCoord.xy;",
-    "  vec2 o = q + 2.4 * vec2(noise(q * 0.03), noise(q * 0.03 + 17.0));",            // righe leggermente ondulate
-    "  float sp = uAltezza / 95.0;",
-    "  float w1 = smoothstep(0.22, 0.66, ombra) * 0.27;",
-    "  float w2 = smoothstep(0.56, 0.82, ombra) * 0.22;",
-    "  float t1 = tratto(o.x * 0.80 + o.y * 0.60, sp, w1, q);",
-    "  float t2 = tratto(o.x * 0.62 - o.y * 0.78, sp * 1.25, w2, q + 40.0);",
-    "  float morbido = pow(ombra, 1.3) * 0.24;",                                                   // sfumatura di grafite sotto le righe
-    "  float grana = (hash(q * 0.7) - 0.5) * 0.06;",                                     // grana della carta
-    "  float t = clamp(max(t1, t2) * 0.85 + morbido + grana, 0.0, 1.0);",
+    "  vec3 d1 = normalize(vec3(0.80, 0.60, 0.30)); vec3 d2 = normalize(vec3(-0.55, 0.75, 0.35));",
+    "  float a = dot(vPo, d1); float b = dot(vPo, d2);",
+    // sfumatura di grafite: tono morbido con striature sottili (la mano che passa la matita in una direzione)
+    "  float striscia = noise(vec2(a * 0.08, b * 0.85)) * 0.70 + noise(vec2(a * 0.19 + 9.0, b * 1.9)) * 0.30;",
+    "  float morbido = pow(ombra, 1.0) * 0.80 * (0.78 + 0.45 * striscia);",
+    // poche righe di tratteggio, solo nelle zone piu' scure
+    "  float w1 = smoothstep(0.42, 0.78, ombra) * 0.18; float w2 = smoothstep(0.68, 0.88, ombra) * 0.14;",
+    "  float pr = 0.55 + 0.45 * noise(vec2(a * 0.2, b * 0.2));",
+    "  float h = max(riga(b / uPasso, w1), riga(a / (uPasso * 1.25), w2)) * pr;",
+    "  float grana = (hash(gl_FragCoord.xy * 0.7) - 0.5) * 0.05 * smoothstep(0.03, 0.2, ombra);",
+    "  float t = clamp(morbido + h * 0.16 + grana, 0.0, 1.0);",
     "  gl_FragColor = vec4(mix(uCarta, uInchiostro, t * 0.9), 1.0);",
     "  #include <colorspace_fragment>",
     "}"].join("\n");
@@ -173,8 +176,11 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
   function costruisciDiscoMatita() {
     // Misure ricavate dallo schizzo (raggio flangia = 100)
     var R = 100, SPESS = 26, R_MOZZO = 43, ALT_MOZZO = 36, R_FORO = 22.4, R_FORI = 70, r_foro = 8;
+    // La luce e' scelta in modo che la prima immagine (foto di partenza) abbia l'ombra a destra, poi resta fissa SUL PEZZO
+    var inizio = new THREE.Matrix4().makeRotationX(INCLINAZIONE).multiply(new THREE.Matrix4().makeRotationZ(ANGOLO_INIZIO));
+    var lucePezzo = new THREE.Vector3(-0.70, 0.55, 0.50).normalize().transformDirection(inizio.clone().invert());
     matGrafite = new THREE.ShaderMaterial({
-      uniforms: { uCarta: { value: new THREE.Color(0xffffff) }, uInchiostro: { value: new THREE.Color(0x2a2a2a) }, uAltezza: { value: 1200 } },
+      uniforms: { uCarta: { value: new THREE.Color(0xffffff) }, uInchiostro: { value: new THREE.Color(0x2a2a2a) }, uLobj: { value: lucePezzo }, uPasso: { value: 3.4 } },
       vertexShader: VERT_MATITA, fragmentShader: FRAG_MATITA, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
     });
     var matContorno = new THREE.MeshBasicMaterial({ color: 0x2f2f2f, side: THREE.BackSide });
@@ -212,7 +218,7 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
     gruppo.scale.setScalar(0.64);
     return gruppo;
   }
-  function aggiornaUniformi() { if (matGrafite) matGrafite.uniforms.uAltezza.value = canvas.height; }
+  function aggiornaUniformi() { /* niente da aggiornare: il tratteggio e' nello spazio del pezzo */ }
 
   function adatta() {
     var w = box.clientWidth, h = box.clientHeight;
@@ -223,8 +229,14 @@ import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
 
   function disegna(t) {
     interno.rotation.z = ANGOLO_INIZIO + (ridotto ? 0 : t * VELOCITA);
-    esterno.rotation.y += (mouseX * MOUSE_X - esterno.rotation.y) * 0.05;
-    esterno.rotation.x += (INCLINAZIONE + mouseY * MOUSE_Y - esterno.rotation.x) * 0.05;
+    if (modo3d) {
+      esterno.rotation.y += (mouseX * MOUSE_X - esterno.rotation.y) * 0.05;
+      esterno.rotation.x += (INCLINAZIONE + mouseY * MOUSE_Y - esterno.rotation.x) * 0.05;
+    } else {
+      // il disco a matita oscilla lentamente da una parte all'altra e annuisce: si vedono le superfici girare (all'istante 0 e' come la foto)
+      esterno.rotation.y = 0.42 * Math.sin(t * 0.45);
+      esterno.rotation.x = INCLINAZIONE + 0.09 * Math.sin(t * 0.31);
+    }
     aggiornaUniformi();
     renderer.render(scena, camera);
   }
