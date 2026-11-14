@@ -205,8 +205,11 @@ html[data-theme="dark"] .btn-primario:hover:not([disabled]) { background: linear
 .rt-testa { position: relative; }
 .rt-testa .rt-num { position: absolute; left: .8rem; top: .7rem; z-index: 1; text-shadow: 0 0 8px #050913; }
 .rt-num { font-family: var(--mono); font-size: .78rem; font-weight: 500; letter-spacing: .14em; color: var(--acc); }
-.rt-foto { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 10px; box-shadow: 0 0 0 1px rgba(34, 211, 238, .2), 0 12px 28px -14px rgba(0, 0, 0, .7); transition: transform .4s ease, box-shadow .3s ease; }
-.reparto-tile:hover .rt-foto { transform: scale(1.03); box-shadow: 0 0 0 1px rgba(34, 211, 238, .55), 0 0 28px -8px rgba(34, 211, 238, .6); }
+/* schizzo a matita senza cornice: tema chiaro = linee scure (il bianco sparisce); tema scuro = linee chiare (colori invertiti) */
+.rt-foto { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: contain; mix-blend-mode: multiply; transition: transform .4s ease, filter .3s ease; }
+html[data-theme="dark"] .rt-foto { filter: invert(1) brightness(1.15); mix-blend-mode: screen; }
+.reparto-tile:hover .rt-foto { transform: scale(1.04); }
+html[data-theme="dark"] .reparto-tile:hover .rt-foto { filter: invert(1) brightness(1.3) drop-shadow(0 0 8px rgba(34, 211, 238, .55)); }
 .rt-testo { position: relative; }
 .reparto-tile h3 { font-size: 1.28rem; font-weight: 800; letter-spacing: .01em; color: var(--titolo); }
 .reparto-tile p { color: var(--muted); font-size: .92rem; margin: .7rem 0 0; }
@@ -375,6 +378,7 @@ html[data-theme="dark"] .numeri strong { background: linear-gradient(180deg, #ff
   .hero-punti { gap: 1.4rem; margin-top: 2rem; }
   .reparti { grid-template-columns: minmax(0, 1fr); }
   .reparto-tile { min-height: 0; gap: 1.2rem; padding: 1.3rem 1.2rem; }
+  .rt-foto { aspect-ratio: 4 / 3; }
   .reparto-tile h3 { font-size: 1.2rem; }
   .numeri { gap: 1.6rem 1rem; }
   .cfg-box { padding: 1.2rem; }
