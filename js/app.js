@@ -195,7 +195,7 @@
   }
 
   /* ---------- Stato del configuratore ---------- */
-  var cfg = { ultimoTotale: null, passo: 1, dati: null, contatti: { azienda: "", nome: "", email: "", telefono: "", note: "" }, accetta: false, errori: {}, inviata: null, file: null, tokenFile: 0 };
+  var cfg = { ultimoTotale: null, passo: 2, dati: nuoviDati("tornitura"), contatti: { azienda: "", nome: "", email: "", telefono: "", note: "" }, accetta: false, errori: {}, inviata: null, file: null, tokenFile: 0 };
   var radice = null;      // contenitore #configuratore-app
   var pannelloPrezzo = null;
 
@@ -247,8 +247,9 @@
   }
   // Cambia passo e lascia traccia nella cronologia: cosi' la freccia indietro del browser
   // e il tasto indietro del mouse tornano al passo precedente.
+  var passoMassimo = 2;                              // passo piu' avanti raggiunto in questa visita (per la freccia indietro dopo un ricaricamento)
   function vaiPasso(n) {
-    cfg.passo = n;
+    cfg.passo = n; passoMassimo = Math.max(passoMassimo, n);
     try { history.pushState({ cfgPasso: n }, "", location.href); } catch (e) { /* senza cronologia si funziona lo stesso */ }
     disegna();
   }
@@ -483,18 +484,19 @@
     return out;
   }
 
-  /* ---------- Passo 1: reparto ---------- */
-  function passoReparto() {
-    var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p1.titolo") }));
-    var griglia = el("div", { class: "reparto-scelta" });
+  /* ---------- Selettore del reparto (in cima al modulo) ---------- */
+  function selettoreReparto() {
+    var g = el("div", { class: "reparto-tabs", role: "group", "aria-label": t("passo.reparto") });
     REPARTI.forEach(function (r) {
-      var ic = el("span", { class: "rc-foto-box" }, fotoReparto(r, "rc-foto", true)); // miniatura ritagliata sul solo pezzo, senza cornice
-      griglia.appendChild(el("button", { type: "button", class: "reparto-card", onclick: function () { scegliReparto(r); } },
-        ic, el("span", { class: "rc-testo" }, el("span", { class: "rc-nome", text: repNome(r) }), el("span", { class: "rc-desc", text: t("rep." + r + ".desc") })),
-        el("span", { class: "rc-freccia", "aria-hidden": "true", text: "→" })));
+      g.appendChild(el("button", { type: "button", class: "reparto-tab", "aria-pressed": String(cfg.dati.reparto === r), title: repNome(r), onclick: function () { if (cfg.dati.reparto !== r) cambiaReparto(r); } },
+        el("span", { class: "rc-foto-box" }, fotoReparto(r, "rc-foto", true)), el("span", { class: "rt-nome", text: t("rep." + r + ".breve") })));
     });
-    box.appendChild(griglia);
-    return box;
+    return el("div", { class: "cfg-gruppo largo cfg-reparti" }, el("span", { class: "etichetta", text: t("passo.reparto") }), g);
+  }
+  function cambiaReparto(id) {                         // cambio di reparto dal selettore: ricomincia il modulo, senza aggiungere voci alla cronologia
+    scartaFile();
+    cfg.dati = nuoviDati(id); cfg.errori = {}; cfg.ultimoTotale = null;
+    disegna();
   }
   function scegliReparto(id, saltaScroll) {
     scartaFile();
@@ -509,7 +511,7 @@
   }
   function passoDettagli() {
     var d = cfg.dati, rep = d.reparto;
-    var box = el("div", { class: "card cfg-box" }, el("h3", { text: t("p2.titolo", { rep: repNome(rep) }) }));
+    var box = el("div", { class: "card cfg-box" }, selettoreReparto(), el("h3", { text: t("p2.titolo", { rep: repNome(rep) }) }));
     box.appendChild(cardFile(rep));
 
     // Il modulo e' diviso in sezioni numerate; i gruppi a mezza larghezza vanno sempre in coppia (mai spazi vuoti)
@@ -591,8 +593,7 @@
     sezione("sz.quantita", [gQuantita, gUrgenza]);
 
     var avanti = el("button", { type: "button", class: "btn btn-primario", id: "btn-avanti", onclick: function () { vaiPasso(3); vaiA("configuratore"); } }, t("b.continua"), el("span", { "aria-hidden": "true", text: "→" }));
-    box.appendChild(el("div", { class: "cfg-azioni" },
-      el("button", { type: "button", class: "btn btn-ghost", onclick: function () { vaiPasso(1); vaiA("configuratore"); } }, t("b.cambia_reparto")), avanti));
+    box.appendChild(el("div", { class: "cfg-azioni" }, avanti));
     return box;
   }
 
@@ -722,7 +723,7 @@
       el("p", { text: t("ok.testo") }),
       el("div", { class: "hero-bottoni", style: "justify-content:center" },
         el("button", { type: "button", class: "btn btn-primario", onclick: function () { location.hash = "#/azienda/" + cfg.inviata; } }, t("ok.vai")),
-        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { scartaFile(); cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; vaiPasso(1); } }, t("ok.nuova"))));
+        el("button", { type: "button", class: "btn btn-ghost", onclick: function () { scartaFile(); cfg.dati = nuoviDati("tornitura"); cfg.inviata = null; cfg.accetta = false; cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" }; vaiPasso(2); } }, t("ok.nuova"))));
   }
 
   /* ---------- Disegno del configuratore ---------- */
@@ -730,17 +731,16 @@
     if (!radice) return;
     var attivo = document.activeElement && document.activeElement.id;
     svuota(radice); pannelloPrezzo = null;
-    var nomi = [t("passo.reparto"), t("passo.pezzo"), t("passo.invio")];
+    var nomi = [t("passo.pezzo"), t("passo.invio")];
     var barra = el("ol", { class: "cfg-passi", style: "list-style:none;padding:0;margin:0 0 1.5rem" });
     nomi.forEach(function (n, i) {
-      var numero = i + 1, stato = cfg.passo === numero ? "attivo" : (cfg.passo > numero ? "fatto" : "");
-      barra.appendChild(el("li", { class: "cfg-passo " + stato, "aria-current": cfg.passo === numero ? "step" : null }, el("b", { text: cfg.passo > numero ? "✓" : String(numero) }), el("span", { text: n })));
+      var numero = i + 2, stato = cfg.passo === numero ? "attivo" : (cfg.passo > numero ? "fatto" : "");   // i passi interni sono 2 (pezzo) e 3 (invio)
+      barra.appendChild(el("li", { class: "cfg-passo " + stato, "aria-current": cfg.passo === numero ? "step" : null }, el("b", { text: cfg.passo > numero ? "✓" : String(i + 1) }), el("span", { text: n })));
     });
     radice.appendChild(barra);
 
     var griglia = el("div", { class: cfg.passo === 2 ? "cfg" : null });
-    if (cfg.passo === 1) griglia.appendChild(passoReparto());
-    else if (cfg.passo === 2) {
+    if (cfg.passo === 2) {
       griglia.appendChild(passoDettagli());
       var corpo = el("div");
       var testa = el("div", { class: "prezzo-testa" }, el("span", { class: "led", "aria-hidden": "true" }), el("h3", { text: t("pz.stima") }), el("span", { class: "live", "aria-hidden": "true", text: "LIVE" }));
@@ -986,7 +986,7 @@
     });
     ripristinaSchedario();
     scartaFile();
-    cfg.passo = 1; cfg.dati = null; cfg.inviata = null; cfg.accetta = false; cfg.errori = {}; cfg.ultimoTotale = null;
+    cfg.passo = 2; cfg.dati = nuoviDati("tornitura"); cfg.inviata = null; cfg.accetta = false; cfg.errori = {}; cfg.ultimoTotale = null;
     cfg.contatti = { azienda: "", nome: "", email: "", telefono: "", note: "" };
     az.sel = null; az.tab = "richieste"; az.kpiAnimati = false;
     seedRichieste();
@@ -1200,8 +1200,8 @@
       var s = ev.state;
       if (!s || typeof s.cfgPasso !== "number") return;
       var n = s.cfgPasso;
-      if (n > 1 && !cfg.dati) n = 1;               // pagina ricaricata: i dati del pezzo non ci sono piu'
-      if (n === 4 && !cfg.inviata) n = 1;
+      if (n < 2 || n > passoMassimo) n = 2;        // pagina ricaricata: i passi successivi non sono piu' stati compilati
+      if (n === 4 && !cfg.inviata) n = 2;
       if (n < 4) cfg.inviata = null;               // tornando indietro dopo l'invio si puo' compilare una nuova richiesta
       cfg.passo = n;
       disegna();

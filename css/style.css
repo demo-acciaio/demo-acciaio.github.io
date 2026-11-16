@@ -56,7 +56,7 @@ html[data-theme="dark"] {
    "premuto" sui riquadri, cosi' si capisce lo stesso che il tocco e' arrivato. */
 * { -webkit-tap-highlight-color: transparent; }
 a, button, [role="button"], label, summary { touch-action: manipulation; }
-.btn:active, .scelta:active, .reparto-card:active, .reparto-tile:active, .icona:active { transform: scale(.97); }
+.btn:active, .scelta:active, .reparto-tile:active, .icona:active { transform: scale(.97); }
 html { font-size: clamp(16px, 1vw, 32px); scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 12px); -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; min-height: 100%; }
 body { font-family: var(--font); font-size: 1rem; line-height: 1.55; color: var(--ink); background: var(--bg); overflow-x: hidden; }
@@ -270,8 +270,6 @@ html[data-theme="dark"] .numeri strong { background: linear-gradient(180deg, #ff
 .cfg-gruppo > .etichetta { display: block; margin-bottom: .5rem; }
 .cfg-griglia { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .cfg-azioni { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
-.reparto-scelta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-.reparto-scelta .scelta { padding: 1.2rem; font-size: 1.05rem; }
 
 .prezzo { position: sticky; top: calc(var(--header-h) + 16px); padding: 1.6rem; }
 .prezzo h3 { font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: .6rem; }
@@ -397,7 +395,6 @@ html[data-theme="dark"] .numeri strong { background: linear-gradient(180deg, #ff
   .numeri { gap: 1.6rem 1rem; }
   .cfg-box { padding: 1.2rem; }
   .cfg-griglia { grid-template-columns: minmax(0, 1fr); }
-  .reparto-scelta { grid-template-columns: minmax(0, 1fr); }
   .cfg-azioni { flex-direction: column-reverse; }
   .cfg-azioni .btn { width: 100%; }
   .cfg-passo span { display: none; }
@@ -507,16 +504,10 @@ html[data-theme="dark"] .anteprima-pdf { filter: brightness(.92); }
 .cfg-passo.attivo::before, .cfg-passo.fatto + .cfg-passo::before { background: var(--acc); }
 
 /* Passo 1: riquadri dei reparti con icona */
-.reparto-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.1rem; padding: 1.25rem 1.3rem; text-align: left; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(165deg, color-mix(in srgb, var(--card) 90%, var(--blu)) 0%, var(--card) 70%); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-.reparto-card:hover { transform: translateY(-3px); border-color: var(--acc); box-shadow: var(--glow); }
 .rc-foto-box { display: block; flex: none; width: 8rem; height: 8rem; }
 .rc-foto { display: block; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
 /* schizzo a matita: tema chiaro = linee scure su sfondo trasparente; tema scuro = linee chiare (colori invertiti), il fondo sparisce */
 html[data-theme="dark"] .rc-foto { filter: invert(1) brightness(1.15); mix-blend-mode: screen; }
-.rc-nome { display: block; font-weight: 800; font-size: 1.05rem; color: var(--titolo); }
-.rc-desc { display: block; margin-top: .25rem; font-size: .82rem; font-weight: 500; color: var(--muted); }
-.rc-freccia { font-family: var(--mono); font-size: 1.3rem; color: var(--acc); transition: transform .2s ease; }
-.reparto-card:hover .rc-freccia { transform: translateX(4px); }
 
 /* Scheda del prezzo */
 .prezzo-testa { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; }
@@ -595,8 +586,6 @@ html[data-theme="dark"] .prezzo-grande { background: linear-gradient(180deg, #ff
 @media (max-width: 440px) {
   .cfg-passo + .cfg-passo { margin-left: 1.1rem; }
   .cfg-passo + .cfg-passo::before { left: -1.1rem; width: 1.1rem; }
-  .reparto-card { grid-template-columns: auto minmax(0, 1fr); padding: 1.1rem; }
-  .rc-freccia { display: none; }
   .rc-foto-box { width: 5.5rem; height: 5.5rem; }
   .kpi { gap: .7rem; }
   .kpi-tessera { padding: .9rem 1rem; }
@@ -684,10 +673,30 @@ html[data-theme="dark"] .selettore-tema .sole { color: var(--muted); }
 .selettore-tema:hover { border-color: var(--acc); color: inherit; }
 
 /* "Premuto" sul telefono per i riquadri: va dopo le regole :hover, altrimenti il tocco non si vede */
-.reparto-card:active, .reparto-tile:active { transform: scale(.98); }
 
 
 /* Tondino del menu: tre barrette da chiuso, croce da aperto */
 #btn-menu .ico-croce { display: none; }
 #btn-menu[aria-expanded="true"] .ico-barrette { display: none; }
 #btn-menu[aria-expanded="true"] .ico-croce { display: block; }
+
+
+/* ==========================================================================
+   12. SELETTORE DEL REPARTO (in cima al modulo, al posto del vecchio passo "Reparto")
+   ========================================================================== */
+.reparto-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; }
+.reparto-tab { display: flex; flex-direction: column; align-items: center; gap: .3rem; min-width: 0; padding: .7rem .4rem .6rem; text-align: center; color: var(--ink); background: var(--bg); border: 1.5px solid var(--line); border-radius: 12px; transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease; }
+.reparto-tab:hover { border-color: var(--blu); }
+.reparto-tab:active { transform: scale(.97); }
+.reparto-tab .rc-foto-box { width: 4.2rem; height: 4.2rem; }
+.rt-nome { font-weight: 700; font-size: .84rem; }
+.reparto-tab[aria-pressed="true"] { color: var(--titolo); border-color: var(--blu); background: color-mix(in srgb, var(--blu) 10%, var(--bg)); box-shadow: inset 0 0 0 1px var(--blu); }
+html[data-theme="dark"] .reparto-tab { background: rgba(255, 255, 255, .02); }
+html[data-theme="dark"] .reparto-tab:hover { border-color: var(--acc); }
+html[data-theme="dark"] .reparto-tab[aria-pressed="true"] { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 12%, var(--bg)); box-shadow: inset 0 0 0 1px var(--acc), 0 0 22px -8px var(--acc); }
+.cfg-azioni .btn-primario:only-child { margin-left: auto; }
+@media (max-width: 440px) {
+  .reparto-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reparto-tab { padding: .6rem .4rem .5rem; }
+  .reparto-tab .rc-foto-box { width: 3.6rem; height: 3.6rem; }
+}

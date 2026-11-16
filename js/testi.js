@@ -15,6 +15,7 @@ it: {
 
   "hero.sopra": "Lavorazioni meccaniche di precisione · Trento",
   "hero.t1": "Configura il tuo pezzo.", "hero.t2": "Ricevi subito il prezzo.",
+  "rep.tornitura.breve": "Tornitura", "rep.fresatura.breve": "Fresatura", "rep.cavi.breve": "Cavi", "rep.assemblaggi.breve": "Assemblaggi",
   "sz.macchina": "Macchina e materiale", "sz.misure": "Misure", "sz.precisione": "Precisione", "sz.finitura": "Finitura e controlli", "sz.prodotto": "Prodotto e misure", "sz.terminali": "Terminali", "sz.controlli": "Controlli", "sz.operazioni": "Operazioni", "sz.componenti": "Componenti", "sz.quantita": "Quantità e consegna",
   "hero.lead": "Tornitura, fresatura, cavi e trasmissioni flessibili, assemblaggi: su disegno, in piccole e medie serie. Descrivi il pezzo o carica il file e ottieni una stima immediata, con il dettaglio dei costi.",
   "hero.cta1": "Configura e richiedi offerta", "hero.cta2": "Scopri le lavorazioni",
@@ -178,6 +179,7 @@ de: {
 
   "hero.sopra": "Präzise mechanische Fertigung · Trient",
   "hero.t1": "Konfigurieren Sie Ihr Teil.", "hero.t2": "Preis sofort erhalten.",
+  "rep.tornitura.breve": "Drehen", "rep.fresatura.breve": "Fräsen", "rep.cavi.breve": "Seile", "rep.assemblaggi.breve": "Montage",
   "sz.macchina": "Maschine und Material", "sz.misure": "Maße", "sz.precisione": "Präzision", "sz.finitura": "Oberfläche und Prüfung", "sz.prodotto": "Produkt und Maße", "sz.terminali": "Endbeschläge", "sz.controlli": "Prüfung", "sz.operazioni": "Arbeitsgänge", "sz.componenti": "Bauteile", "sz.quantita": "Menge und Lieferung",
   "hero.lead": "Drehen, Fräsen, Seile und flexible Wellen, Montage: nach Zeichnung, in kleinen und mittleren Serien. Beschreiben Sie das Teil oder laden Sie die Datei hoch und erhalten Sie sofort eine Schätzung mit Kostenaufstellung.",
   "hero.cta1": "Konfigurieren und Angebot anfragen", "hero.cta2": "Bearbeitungen entdecken",
@@ -361,6 +363,7 @@ en: {
 
   "hero.sopra": "Precision mechanical machining · Trento",
   "hero.t1": "Configure your part.", "hero.t2": "Get the price instantly.",
+  "rep.tornitura.breve": "Turning", "rep.fresatura.breve": "Milling", "rep.cavi.breve": "Cables", "rep.assemblaggi.breve": "Assembly",
   "sz.macchina": "Machine and material", "sz.misure": "Dimensions", "sz.precisione": "Precision", "sz.finitura": "Finish and inspection", "sz.prodotto": "Product and dimensions", "sz.terminali": "End fittings", "sz.controlli": "Inspection", "sz.operazioni": "Operations", "sz.componenti": "Components", "sz.quantita": "Quantity and delivery",
   "hero.lead": "Turning, milling, cables and flexible transmissions, assembly: made to drawing, in small and medium batches. Describe the part or upload the file and get an instant estimate with a cost breakdown.",
   "hero.cta1": "Configure and request a quote", "hero.cta2": "Discover our services",
