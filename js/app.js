@@ -1060,7 +1060,7 @@
   // Immagini 3D dei quattro reparti (img/reparto-*.webp, creati da Massimo con un generatore di immagini e normalizzati: stesso esagono, quadrati 640x640)
   function fotoReparto(r, classe, miniatura) {
     var lato = miniatura ? 320 : 640;
-    return el("img", { class: classe, src: "img/" + (miniatura ? "mini-" : "reparto-") + r + ".webp?v=60", alt: "", width: lato, height: lato, loading: "lazy", decoding: "async" });
+    return el("img", { class: classe, src: "img/" + (miniatura ? "mini-" : "reparto-") + r + ".webp?v=61", alt: "", width: lato, height: lato, loading: "lazy", decoding: "async" });
   }  var tilesViste = false;
   function costruisciTile() {
     var griglia = document.getElementById("griglia-reparti");
